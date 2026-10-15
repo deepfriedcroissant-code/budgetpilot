@@ -1,0 +1,6 @@
+{
+  "chips": {"name": "Chips variety pack", "price": "9.99", "category": "snacks"},
+  "cookies": {"name": "Cookie box", "price": "5.99", "category": "snacks"},
+  "water": {"name": "Bottled water pack", "price": "7.99", "category": "drinks"},
+  "juice": {"name": "Juice pack", "price": "6.99", "category": "drinks"}
+}
