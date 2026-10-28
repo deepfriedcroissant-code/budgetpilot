@@ -1,6 +1,278 @@
 {
-  "chips": {"name": "Chips variety pack", "price": "9.99", "category": "snacks"},
-  "cookies": {"name": "Cookie box", "price": "5.99", "category": "snacks"},
-  "water": {"name": "Bottled water pack", "price": "7.99", "category": "drinks"},
-  "juice": {"name": "Juice pack", "price": "6.99", "category": "drinks"}
+  "salted_chips": {
+    "name": "Classic Salted Potato Chips (8 oz)",
+    "price": "3.49",
+    "category": "snacks",
+    "stock": 120
+  },
+  "bbq_chips": {
+    "name": "BBQ Potato Chips (8 oz)",
+    "price": "3.49",
+    "category": "snacks",
+    "stock": 100
+  },
+  "tortilla_chips": {
+    "name": "Tortilla Chips (13 oz)",
+    "price": "3.99",
+    "category": "snacks",
+    "stock": 90
+  },
+  "popcorn": {
+    "name": "Buttery Popcorn Multipack (6 ct)",
+    "price": "4.79",
+    "category": "snacks",
+    "stock": 80
+  },
+  "cheese_crackers": {
+    "name": "Cheese Crackers (12 oz)",
+    "price": "3.29",
+    "category": "snacks",
+    "stock": 110
+  },
+  "pretzels": {
+    "name": "Pretzel Twists (16 oz)",
+    "price": "2.99",
+    "category": "snacks",
+    "stock": 95
+  },
+  "trail_mix": {
+    "name": "Trail Mix (20 oz)",
+    "price": "7.99",
+    "category": "snacks",
+    "stock": 60
+  },
+  "cookies": {
+    "name": "Chocolate Chip Cookies (14 oz)",
+    "price": "3.79",
+    "category": "snacks",
+    "stock": 85
+  },
+  "granola_bars": {
+    "name": "Granola Bars Variety Pack (12 ct)",
+    "price": "5.49",
+    "category": "snacks",
+    "stock": 70
+  },
+  "gummy_bears": {
+    "name": "Gummy Bears (10 oz)",
+    "price": "2.79",
+    "category": "snacks",
+    "stock": 130
+  },
+  "water": {
+    "name": "Bottled Water 24-Pack",
+    "price": "4.99",
+    "category": "drinks",
+    "stock": 150
+  },
+  "sparkling_water": {
+    "name": "Sparkling Water Lemon (12 ct)",
+    "price": "5.99",
+    "category": "drinks",
+    "stock": 80
+  },
+  "cola": {
+    "name": "Cola 12-Pack Cans",
+    "price": "6.99",
+    "category": "drinks",
+    "stock": 100
+  },
+  "lemon_lime_soda": {
+    "name": "Lemon-Lime Soda 12-Pack Cans",
+    "price": "6.99",
+    "category": "drinks",
+    "stock": 90
+  },
+  "orange_juice": {
+    "name": "Orange Juice (52 oz)",
+    "price": "4.49",
+    "category": "drinks",
+    "stock": 60
+  },
+  "juice_boxes": {
+    "name": "Apple Juice Boxes (10 ct)",
+    "price": "4.29",
+    "category": "drinks",
+    "stock": 75
+  },
+  "iced_tea": {
+    "name": "Iced Tea Lemon (64 oz)",
+    "price": "2.99",
+    "category": "drinks",
+    "stock": 70
+  },
+  "sports_drink": {
+    "name": "Sports Drink Variety (8 ct)",
+    "price": "8.99",
+    "category": "drinks",
+    "stock": 55
+  },
+  "cold_brew": {
+    "name": "Cold Brew Coffee (32 oz)",
+    "price": "5.49",
+    "category": "drinks",
+    "stock": 40
+  },
+  "lemonade_mix": {
+    "name": "Instant Lemonade Mix (19 oz)",
+    "price": "3.99",
+    "category": "drinks",
+    "stock": 65
+  },
+  "bread": {
+    "name": "Sandwich Bread Loaf",
+    "price": "2.79",
+    "category": "groceries",
+    "stock": 50
+  },
+  "peanut_butter": {
+    "name": "Peanut Butter (16 oz)",
+    "price": "3.49",
+    "category": "groceries",
+    "stock": 70
+  },
+  "jam": {
+    "name": "Strawberry Jam (18 oz)",
+    "price": "2.99",
+    "category": "groceries",
+    "stock": 60
+  },
+  "pasta": {
+    "name": "Spaghetti Pasta (16 oz)",
+    "price": "1.79",
+    "category": "groceries",
+    "stock": 140
+  },
+  "marinara_sauce": {
+    "name": "Marinara Sauce (24 oz)",
+    "price": "3.19",
+    "category": "groceries",
+    "stock": 90
+  },
+  "rice": {
+    "name": "Long Grain White Rice (5 lb)",
+    "price": "5.49",
+    "category": "groceries",
+    "stock": 45
+  },
+  "eggs": {
+    "name": "Large Eggs (12 ct)",
+    "price": "3.99",
+    "category": "groceries",
+    "stock": 40
+  },
+  "milk": {
+    "name": "Whole Milk (1 gal)",
+    "price": "3.89",
+    "category": "groceries",
+    "stock": 35
+  },
+  "cheddar_cheese": {
+    "name": "Cheddar Cheese Block (16 oz)",
+    "price": "4.99",
+    "category": "groceries",
+    "stock": 50
+  },
+  "bananas": {
+    "name": "Bananas (per lb)",
+    "price": "0.69",
+    "category": "groceries",
+    "stock": 200
+  },
+  "paper_plates": {
+    "name": "Paper Plates (50 ct)",
+    "price": "4.49",
+    "category": "party_supplies",
+    "stock": 100
+  },
+  "plastic_cups": {
+    "name": "Plastic Cups 16 oz (50 ct)",
+    "price": "4.99",
+    "category": "party_supplies",
+    "stock": 100
+  },
+  "cutlery": {
+    "name": "Plastic Cutlery Set (100 ct)",
+    "price": "3.99",
+    "category": "party_supplies",
+    "stock": 80
+  },
+  "napkins": {
+    "name": "Paper Napkins (200 ct)",
+    "price": "2.99",
+    "category": "party_supplies",
+    "stock": 120
+  },
+  "balloons": {
+    "name": "Birthday Balloons Assorted (20 ct)",
+    "price": "3.99",
+    "category": "party_supplies",
+    "stock": 60
+  },
+  "streamers": {
+    "name": "Party Streamer Decorations",
+    "price": "2.49",
+    "category": "party_supplies",
+    "stock": 50
+  },
+  "paper_towels": {
+    "name": "Paper Towels (6 rolls)",
+    "price": "8.99",
+    "category": "household",
+    "stock": 60
+  },
+  "trash_bags": {
+    "name": "Trash Bags 13 gal (40 ct)",
+    "price": "7.49",
+    "category": "household",
+    "stock": 70
+  },
+  "dish_soap": {
+    "name": "Dish Soap (24 oz)",
+    "price": "3.49",
+    "category": "household",
+    "stock": 80
+  },
+  "all_purpose_cleaner": {
+    "name": "All-Purpose Cleaner Spray",
+    "price": "3.99",
+    "category": "household",
+    "stock": 65
+  },
+  "hand_sanitizer": {
+    "name": "Hand Sanitizer (8 oz)",
+    "price": "2.99",
+    "category": "health",
+    "stock": 90
+  },
+  "bandages": {
+    "name": "Adhesive Bandages (100 ct)",
+    "price": "3.49",
+    "category": "health",
+    "stock": 75
+  },
+  "face_masks": {
+    "name": "Disposable Face Masks (50 ct)",
+    "price": "6.99",
+    "category": "health",
+    "stock": 50
+  },
+  "ice_cream": {
+    "name": "Vanilla Ice Cream (1.5 qt)",
+    "price": "4.99",
+    "category": "frozen",
+    "stock": 45
+  },
+  "frozen_pizza": {
+    "name": "Cheese Pizza (12 in)",
+    "price": "5.49",
+    "category": "frozen",
+    "stock": 55
+  },
+  "frozen_berries": {
+    "name": "Frozen Mixed Berries (32 oz)",
+    "price": "7.49",
+    "category": "frozen",
+    "stock": 30
+  }
 }
