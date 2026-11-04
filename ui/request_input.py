@@ -8,6 +8,9 @@ EXAMPLE_REQUESTS = (
     "Drinks for 5 guests under $25",
 )
 
+def _use_example(text: str) -> None:
+    """Callback: put an example into the text box."""
+    st.session_state["shopping_request_text"] = text
 
 def render_request_input() -> tuple[dict | None, str | None]:
     """Return (parsed request, error); (None, None) means no submission.
@@ -18,18 +21,34 @@ def render_request_input() -> tuple[dict | None, str | None]:
     """
     st.subheader("Describe your shopping request")
     with st.expander("Example requests"):
-        for example in EXAMPLE_REQUESTS:
-            st.write(example)
+        st.caption("Click an example to fill in the text box.")
+        for i, example in enumerate(EXAMPLE_REQUESTS):
+            st.button(
+                example,
+                key=f"example_request_{i}",
+                on_click=_use_example,
+                args=(example,),
+                use_container_width=True,
+            )
+
     with st.form("shopping_request_form"):
-        message = st.text_area("What do you need?", key="shopping_request_text")
-        submitted = st.form_submit_button("Generate Cart")
+        message = st.text_area(
+            "What do you need?",
+            key="shopping_request_text",
+            placeholder="e.g. Snacks and drinks for 20 people under $100",
+        )
+        submitted = st.form_submit_button("Generate Cart", type="primary")
+
     if not submitted:
         return None, None
+    
     if not message.strip():
         return None, "Please enter a shopping request."
+    
     try:
         with st.spinner("Interpreting your request…"):
             return parse_request(message.strip()), None
+        
     except Exception:
         # Keep provider responses and credentials out of the user interface.
         return None, "We could not process your request. Please try again."
