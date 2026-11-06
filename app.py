@@ -27,12 +27,13 @@ SAMPLE_REQUEST = {
 
 
 def _clear_checkout_state() -> None:
-    """Invalidate stale approval and order data when the request/cart changes."""
-    for key in (
-        "checkout_order_result", "checkout_error", "checkout_cart_fp",
-        "budgetpilot_cart_valid", "budgetpilot_cart_changed",
-    ):
-        st.session_state.pop(key, None)
+    """Invalidate stale approvals and orders whenever request/cart changes."""
+    for key in list(st.session_state.keys()):
+        if key.startswith("checkout_approved_") or key in (
+            "checkout_order_result", "checkout_error", "checkout_cart_fp",
+            "budgetpilot_cart_valid", "budgetpilot_cart_changed",
+        ):
+            st.session_state.pop(key, None)
 
 
 def _apply_request(request: dict) -> None:
