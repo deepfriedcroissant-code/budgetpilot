@@ -26,8 +26,12 @@ if not key:
     print("FAIL: Add a newly generated GEMINI_API_KEY to .env beside app.py.")
     raise SystemExit(1)
 
+client = None
 try:
-    response = genai.Client(api_key=key).models.generate_content(
+    # Hold a strong reference for the entire request; constructing the client
+    # inline can allow its transport to close before generate_content finishes.
+    client = genai.Client(api_key=key)
+    response = client.models.generate_content(
         model=model,
         contents="Return the single word SUCCESS.",
         config={"max_output_tokens": 128, "thinking_config": {"thinking_level": "low"}}
@@ -53,3 +57,7 @@ except Exception as exc:
     print("Underlying cause type:", type(exc.__cause__).__name__ if exc.__cause__ else "None")
     print("Review output for secrets before sharing; do not share raw exceptions.")
     raise SystemExit(1)
+
+finally:
+    if client is not None:
+        client.close()
