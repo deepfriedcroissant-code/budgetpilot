@@ -18,12 +18,15 @@ For natural-language input, create a local uncommitted `.env` next to `app.py`:
 
 ```dotenv
 GEMINI_API_KEY=your_new_google_ai_studio_api_key
-GEMINI_MODEL=gemini-3.8-flash
+GEMINI_MODEL=gemini-3.1-flash-lite
 ```
 
-The Gemini 3.8 Flash parser uses `low` thinking to reduce latency for the four-field
-intent extraction. The model is configurable via `GEMINI_MODEL`; other model IDs
-are not forced to use this setting. The VS Code / Streamlit terminal logs only
+If you already have a local `.env`, edit its `GEMINI_MODEL` line too; Git does
+not update private, untracked `.env` files. Verify with
+`python scripts/check_gemini.py` before launching Streamlit.
+
+The Gemini 3.1 Flash-Lite parser requests JSON for four-field intent extraction.
+The model is configurable via `GEMINI_MODEL`. The VS Code / Streamlit terminal logs only
 Gemini model ID and API elapsed seconds for performance testing. It does not
 log your request or credentials. Do not put real keys in `.env.example`.
 
