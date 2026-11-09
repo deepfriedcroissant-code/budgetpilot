@@ -1,6 +1,7 @@
 """Gemini shopping-intent parser with explicit local .env support."""
 import json
 import os
+import time
 from pathlib import Path
 
 
@@ -30,6 +31,15 @@ def _get_gemini_key() -> str:
     return key
 
 
+def _generation_config(model: str) -> dict:
+    """Use low thinking only for the supported Gemini 3.8 Flash model."""
+    config = {"response_mime_type": "application/json"}
+    if model == "gemini-3.8-flash":
+        config["thinking_config"] = {"thinking_level": "low"}
+        config["max_output_tokens"] = 1024
+    return config
+
+
 def parse_request(message: str) -> dict:
     """Extract shopping requirements: budget, people, categories, priority."""
     if not isinstance(message, str) or not message.strip():
@@ -54,11 +64,13 @@ def parse_request(message: str) -> dict:
         "Do not create a cart. Shopping request: " + message.strip()
     )
 
+    model = os.getenv("GEMINI_MODEL", "gemini-3.8-flash").strip() or "gemini-3.8-flash"
+    start = time.perf_counter()
     try:
         response = client.models.generate_content(
-            model=os.getenv("GEMINI_MODEL", "gemini-2.5-flash"),
+            model=model,
             contents=prompt,
-            config={"response_mime_type": "application/json"},
+            config=_generation_config(model),
         )
     except Exception as exc:
         # Never surface provider exception strings or request headers:
@@ -68,11 +80,14 @@ def parse_request(message: str) -> dict:
             explanation = "Gemini rejected the API key. Generate a new Gemini key and update your local .env."
         elif any(s in message_lower for s in ("quota", "rate limit", "429", "resource_exhausted")):
             explanation = "Gemini quota or rate limit reached. Check your Gemini API quota and retry later."
-        elif any(s in message_lower for s in ("not found", "404", "model")):
+        elif any(s in message_lower for s in ("not found", "404", "unsupported model", "model not available")):
             explanation = "The configured Gemini model may be unavailable. Check GEMINI_MODEL in your local .env."
         else:
             explanation = "Gemini could not be reached. Check your connection, key permissions, and model configuration."
         raise GeminiRequestError(explanation) from exc
+    finally:
+        # Only log the model and elapsed time; never log user requests or keys.
+        print(f"Gemini API ({model}) took {time.perf_counter() - start:.2f} seconds")
 
     if not response.text:
         raise GeminiRequestError("Gemini returned an empty response. Please retry.")

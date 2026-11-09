@@ -14,7 +14,18 @@ streamlit run app.py
 ```
 
 Click **Try sample** to use a fixed request without Gemini/API credentials.
-For natural-language input, put a Gemini key in a local uncommitted `.env`.
+For natural-language input, create a local uncommitted `.env` next to `app.py`:
+
+```dotenv
+GEMINI_API_KEY=your_new_google_ai_studio_api_key
+GEMINI_MODEL=gemini-3.8-flash
+```
+
+The Gemini 3.8 Flash parser uses `low` thinking to reduce latency for the four-field
+intent extraction. The model is configurable via `GEMINI_MODEL`; other model IDs
+are not forced to use this setting. The VS Code / Streamlit terminal logs only
+Gemini model ID and API elapsed seconds for performance testing. It does not
+log your request or credentials. Do not put real keys in `.env.example`.
 
 PayPal Sandbox is **disabled by default**. When Andrew and the integration lead
 are ready for Sandbox tests, configure the local credentials and explicitly
