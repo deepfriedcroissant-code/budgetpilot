@@ -4,6 +4,7 @@ Run from the repository root: python scripts/check_gemini.py
 Never print or commit API keys, .env files, or raw provider exception payloads.
 """
 import os
+import re
 import sys
 from pathlib import Path
 
@@ -43,5 +44,12 @@ except Exception as exc:
     print("Error class:", type(exc).__name__)
     print("HTTP code:", code if code is not None else "unavailable")
     print("Status:", status if status is not None else "unavailable")
-    print("Do not share API keys or full raw exceptions.")
+    # Remove common credential patterns before showing the underlying error.
+    details = str(exc).replace(key, "[REDACTED]")
+    details = re.sub(r"(?i)(key=|api_key=|api[-_]key: ?|authorization: ?bearer )[\\w.\\-]+", r"\\1[REDACTED]", details)
+    details = re.sub(r"AIza[0-9A-Za-z_-]{20,}", "[REDACTED]", details)
+    details = re.sub(r"AQ\\.[A-Za-z0-9_-]{15,}", "[REDACTED]", details)
+    print("Exception details (redacted):", details[:1000])
+    print("Underlying cause type:", type(exc.__cause__).__name__ if exc.__cause__ else "None")
+    print("Review output for secrets before sharing; do not share raw exceptions.")
     raise SystemExit(1)
