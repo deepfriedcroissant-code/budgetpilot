@@ -76,14 +76,33 @@ def parse_request(message: str) -> dict:
         # Never surface provider exception strings or request headers:
         # some SDK exceptions can include sensitive request details.
         message_lower = str(exc).lower()
-        if any(s in message_lower for s in ("api key not valid", "api_key_invalid", "invalid api key", "401", "unauthenticated")):
-            explanation = "Gemini rejected the API key. Generate a new Gemini key and update your local .env."
-        elif any(s in message_lower for s in ("quota", "rate limit", "429", "resource_exhausted")):
-            explanation = "Gemini quota or rate limit reached. Check your Gemini API quota and retry later."
-        elif any(s in message_lower for s in ("not found", "404", "unsupported model", "model not available")):
-            explanation = "The configured Gemini model may be unavailable. Check GEMINI_MODEL in your local .env."
+        code = str(getattr(exc, "code", "") or "")
+        status = str(getattr(exc, "status", "") or "").lower()
+        if code == "401" or "unauthenticated" in status or any(
+            s in message_lower for s in ("api key not valid", "api_key_invalid", "invalid api key")
+        ):
+            explanation = "Gemini rejected the API key (401). Replace GEMINI_API_KEY in your local .env."
+        elif code == "403" or "permission_denied" in status or "permission denied" in message_lower:
+            explanation = "Gemini access denied (403). Check API-key restrictions and Gemini API permissions."
+        elif code == "429" or "resource_exhausted" in status or any(
+            s in message_lower for s in ("quota", "rate limit")
+        ):
+            explanation = "Gemini quota or rate limit reached (429). Check your Gemini API quota."
+        elif code == "404" or "not_found" in status or any(
+            s in message_lower for s in ("unsupported model", "model not available")
+        ):
+            explanation = f"Gemini model '{model}' was not found or is unavailable to this API key (404)."
+        elif code == "400" or "invalid_argument" in status:
+            explanation = "Gemini rejected the request (400). Check the model configuration and API settings."
+        elif code in ("500", "502", "503", "504") or "unavailable" in status:
+            explanation = f"Gemini service temporarily unavailable ({code or 'server error'}). Retry."
+        elif any(s in message_lower for s in ("timeout", "timed out", "connection", "dns", "ssl", "certificate")):
+            explanation = "Connection to Gemini failed. Check network, proxy, firewall, or certificates."
         else:
-            explanation = "Gemini could not be reached. Check your connection, key permissions, and model configuration."
+            explanation = (
+                "Gemini request failed. Run 'python scripts/check_gemini.py' "
+                "to diagnose the API key, model, and connection safely."
+            )
         raise GeminiRequestError(explanation) from exc
     finally:
         # Only log the model and elapsed time; never log user requests or keys.
