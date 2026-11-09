@@ -32,11 +32,8 @@ def _get_gemini_key() -> str:
 
 
 def _generation_config(model: str) -> dict:
-    """Use low thinking only for the supported Gemini 3.8 Flash model."""
+    """Use a concise JSON response for shopping-intent extraction."""
     config = {"response_mime_type": "application/json"}
-    if model == "gemini-3.8-flash":
-        config["thinking_config"] = {"thinking_level": "low"}
-        config["max_output_tokens"] = 1024
     return config
 
 
@@ -64,7 +61,7 @@ def parse_request(message: str) -> dict:
         "Do not create a cart. Shopping request: " + message.strip()
     )
 
-    model = os.getenv("GEMINI_MODEL", "gemini-3.8-flash").strip() or "gemini-3.8-flash"
+    model = os.getenv("GEMINI_MODEL", "gemini-3.1-flash-lite").strip() or "gemini-3.1-flash-lite"
     start = time.perf_counter()
     try:
         response = client.models.generate_content(
