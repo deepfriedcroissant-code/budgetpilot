@@ -17,7 +17,7 @@ from google import genai
 load_dotenv(ROOT / ".env", override=False)
 
 key = (os.getenv("GEMINI_API_KEY") or "").strip()
-model = (os.getenv("GEMINI_MODEL") or "gemini-3.8-flash").strip()
+model = (os.getenv("GEMINI_MODEL") or "gemini-3.1-flash-lite").strip()
 
 print("GEMINI_API_KEY present:", bool(key))
 print("GEMINI_MODEL:", model)
@@ -34,8 +34,7 @@ try:
     response = client.models.generate_content(
         model=model,
         contents="Return the single word SUCCESS.",
-        config={"max_output_tokens": 128, "thinking_config": {"thinking_level": "low"}}
-        if model == "gemini-3.8-flash" else {"max_output_tokens": 128},
+        config={"max_output_tokens": 256},
     )
     if response.text and "SUCCESS" in response.text.upper():
         print("PASS: Gemini API reachable and generating text.")
