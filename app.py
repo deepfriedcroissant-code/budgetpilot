@@ -6,8 +6,11 @@ Run: streamlit run app.py
 """
 import os
 from decimal import Decimal
+from dotenv import load_dotenv
 
 import streamlit as st
+
+load_dotenv()
 
 from catalog import CATEGORIES, load_catalog
 from optimizer import recommend_cart, calculate_total
@@ -76,6 +79,9 @@ for key, value in (
         st.session_state[key] = value
 
 st.title("BudgetPilot")
+
+
+
 st.caption("AI-assisted shopping that respects your budget. · Integration preview")
 st.markdown(
     "Describe your shopping needs, review real catalog recommendations, "
@@ -167,3 +173,23 @@ if request is not None:
         )
 else:
     st.info("Enter a request or try the sample above to see product recommendations.")
+
+# Catch PayPal Sandbox return redirects (?payment=success&token=ORDER_ID)
+if st.query_params.get("payment") == "success" and st.query_params.get("token"):
+    token = st.query_params.get("token")
+    from paypal_api import capture_order
+    with st.spinner(f"Capturing PayPal Sandbox payment for Order {token}..."):
+        try:
+            captured = capture_order(token)
+            st.session_state["last_captured_order"] = captured
+            st.query_params.clear()
+        except Exception as exc:
+            st.error(f"PayPal capture failed: {exc}")
+            st.query_params.clear()
+
+if "last_captured_order" in st.session_state:
+    cap = st.session_state["last_captured_order"]
+    st.success(
+        f"🎉 **Payment Completed & Captured!** "
+        f"Order ID: `{cap.get('order_id')}` · Status: `{cap.get('status')}`"
+    )
