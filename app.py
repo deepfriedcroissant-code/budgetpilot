@@ -49,6 +49,19 @@ def _clear_checkout_state(*, reset_cart_validation: bool = True) -> None:
             st.session_state.pop(key, None)
 
 
+
+def _apply_suggested_cart(proposed_cart: list[dict], original_cart: list[dict], version: int) -> None:
+    """Update quantity widgets in a Streamlit callback, before they render.
+
+    Streamlit disallows assigning to a number_input's session key after
+    that widget has been instantiated in the same execution.
+    """
+    quantities = {item["id"]: item["quantity"] for item in proposed_cart}
+    for item in original_cart:
+        st.session_state[f"cart_{version}_{item['id']}"] = quantities.get(item["id"], 0)
+    _clear_checkout_state(reset_cart_validation=False)
+
+
 def _apply_request(request: dict) -> None:
     """Validate once, load trusted catalog, and produce new recommendation."""
     from validator import validate_request
@@ -215,17 +228,11 @@ if request is not None:
             if proposed_cart and proposed_changes:
                 st.info("Suggested changes: " + "; ".join(proposed_changes))
                 st.caption(f"Proposed new total: ${calculate_total(proposed_cart, catalog):,.2f}")
-                if st.button("Apply suggested changes", type="secondary"):
-                    # The cart editor uses quantity widgets keyed by recommendation
-                    # version. Update those widgets before the next rerun; the cart
-                    # editor then revalidates, and checkout approval is invalidated.
-                    proposed_quantities = {p["id"]: p["quantity"] for p in proposed_cart}
-                    for original in recommended:
-                        st.session_state[
-                            f"cart_{st.session_state.bp_cart_version}_{original['id']}"
-                        ] = proposed_quantities.get(original["id"], 0)
-                    _clear_checkout_state(reset_cart_validation=False)
-                    st.rerun()
+                st.button(
+                    "Apply suggested changes", type="secondary",
+                    on_click=_apply_suggested_cart,
+                    args=(proposed_cart, recommended, st.session_state.bp_cart_version),
+                )
             elif not proposed_cart:
                 st.warning("No products can fit this budget. Try a different shopping request.")
     st.divider()
