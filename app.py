@@ -144,6 +144,7 @@ if request is not None:
     if edited != st.session_state.bp_current_cart:
         _clear_checkout_state()
         st.session_state.bp_current_cart = edited
+        st.toast("Cart updated", icon="🛒")
 
     valid = bool(st.session_state.get("budgetpilot_cart_valid", False))
     st.divider()
