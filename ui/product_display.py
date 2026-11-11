@@ -104,7 +104,7 @@ def build_rows(cart, catalog):
 # Streamlit rendering
 # --------------------------------------------------------------------------
 def render_product_display(cart, catalog, layout="cards", show_quantity=True,
-                           columns=3):
+                           columns=3, request=None):
     """Render the recommended products. layout: 'cards' or 'table'.
 
     Returns the rows so app.py can reuse them. Display only: totals and
@@ -132,11 +132,11 @@ def render_product_display(cart, catalog, layout="cards", show_quantity=True,
     if layout == "table":
         _render_table(st, rows, show_quantity)
     else:
-        _render_cards(st, rows, show_quantity, columns)
+        _render_cards(st, rows, show_quantity, columns, request=request)
     return rows
 
 
-def _render_cards(st, rows, show_quantity, columns):
+def _render_cards(st, rows, show_quantity, columns, request=None):
     for start in range(0, len(rows), columns):
         cols = st.columns(columns)
         for col, row in zip(cols, rows[start:start + columns]):
@@ -154,6 +154,10 @@ def _render_cards(st, rows, show_quantity, columns):
                 )
                 st.caption(f'{format_stock(row["stock"])} · {row["quantity"]} in your cart' if show_quantity
                            else format_stock(row["stock"]))
+                if request is not None:
+                    from shopping_assistant import explain_recommendation
+                    with st.expander("Why this pick?"):
+                        st.caption(explain_recommendation(catalog[row["id"]], request))
                 for w in row["warnings"]:
                     st.warning(w)
 
