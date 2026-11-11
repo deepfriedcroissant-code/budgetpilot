@@ -9,6 +9,7 @@ import hashlib
 import json
 import streamlit as st
 from paypal_api import create_order
+from checkout_flow import record_order
 
 
 def _cart_fingerprint(cart: list[dict], budget: float | None, cart_version: int) -> str:
@@ -90,7 +91,9 @@ def render_checkout(
             try:
                 # Never bypass backend budget/stock validation.
                 order_data = create_order(active_cart, catalog, budget=budget)
-
+                # Store the trusted order/nonce on disk before sending the buyer to PayPal.
+                # Streamlit may create a new browser session when PayPal redirects back.
+                record_order(order_data)
                 st.session_state["checkout_order_result"] = order_data
                 existing_order = order_data
             except Exception as exc:
@@ -128,10 +131,10 @@ def render_checkout(
                 st.link_button("👉 Approve Order on PayPal Sandbox", approval_url)
             else:
                 st.markdown(f"👉 **[Approve Order on PayPal Sandbox]({approval_url})**")
-            st.caption(f"Approval URL: `{approval_url}`")
+            st.caption("You will return to BudgetPilot after approving in PayPal Sandbox.")
 
         st.info(
-            "**Note:** A created order prepares the payment handoff and is **not** proof of completed payment. "
+            "**Note:** Order creation is not payment. Only a verified PayPal capture confirms completion. "
             "Edit any item quantity above if you wish to modify your cart and create a new order."
         )
 
