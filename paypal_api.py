@@ -229,6 +229,46 @@ def capture_order(order_id: str) -> dict:
         "total": amount.get("value"),
         "currency": amount.get("currency_code"),
         "capture_id": capture.get("id"),
+        "reason": (capture.get("status_details") or {}).get("reason"),
+    }
+
+
+def get_order_status(order_id: str) -> dict:
+    """Read an existing Sandbox order and its capture; NEVER create/capture again.
+
+    Order-level COMPLETED is insufficient: the capture itself must report
+    COMPLETED before the app can display a successful payment.
+    """
+    _require_sandbox()
+    if not isinstance(order_id, str) or not order_id.strip():
+        raise ValueError("A PayPal order ID is required.")
+    token = get_access_token()
+    response = requests.get(
+        f"{PAYPAL_BASE_URL}/v2/checkout/orders/{order_id}",
+        headers={"Authorization": f"Bearer {token}"},
+        timeout=15,
+    )
+    if response.status_code != 200:
+        raise RuntimeError(f"Unable to read PayPal Sandbox order ({response.status_code}).")
+    data = response.json()
+    captures = [
+        capture
+        for unit in data.get("purchase_units", [])
+        for capture in (unit.get("payments") or {}).get("captures", [])
+    ]
+    if len(captures) > 1:
+        raise ValueError("Multiple captures found; manual reconciliation required.")
+    if not captures:
+        return {"order_id": data.get("id"), "status": "NO_CAPTURE", "capture_id": None}
+    capture = captures[0]
+    amount = capture.get("amount") or {}
+    return {
+        "order_id": data.get("id"),
+        "status": str(capture.get("status") or "").upper(),
+        "total": amount.get("value"),
+        "currency": amount.get("currency_code"),
+        "capture_id": capture.get("id"),
+        "reason": (capture.get("status_details") or {}).get("reason"),
     }
 
 
