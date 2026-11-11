@@ -30,11 +30,31 @@ The model is configurable via `GEMINI_MODEL`. The VS Code / Streamlit terminal l
 Gemini model ID and API elapsed seconds for performance testing. It does not
 log your request or credentials. Do not put real keys in `.env.example`.
 
-PayPal Sandbox is **disabled by default**. When Andrew and the integration lead
-are ready for Sandbox tests, configure the local credentials and explicitly
-set `BUDGETPILOT_ENABLE_PAYPAL_SANDBOX=1` in the environment. Merely creating
-an order does not capture a payment. The return-and-capture flow still requires
-implementation and verification before a successful-payment claim.
+PayPal Sandbox is **disabled by default**. To test the complete flow, place
+Sandbox credentials in the uncommitted local `.env` alongside `app.py`:
+
+```dotenv
+PAYPAL_CLIENT_ID=your_sandbox_client_id
+PAYPAL_CLIENT_SECRET=your_sandbox_client_secret
+PAYPAL_BASE_URL=https://api-m.sandbox.paypal.com
+APP_URL=http://localhost:8501
+BUDGETPILOT_ENABLE_PAYPAL_SANDBOX=1
+```
+
+Create a cart, explicitly approve it, create the order, then click the Sandbox
+approval link and sign in as a **Sandbox buyer**. PayPal redirects back to
+BudgetPilot with a one-time verification state; BudgetPilot retrieves a matching
+locally stored order, captures once, and verifies COMPLETED status, amount, and
+currency before displaying success. It stores local order state in an ignored
+SQLite file under `.budgetpilot/` so it works across Streamlit browser sessions.
+
+**Limitations:** Sandbox only; manual browser approval is required. The live
+Google Gemini and PayPal APIs have not been verified by CI. Local SQLite is
+suitable for a single-machine demo, not a distributed hosting deployment.
+If a capture produces an unknown result, the app blocks automatic retries:
+inspect the order in the Sandbox dashboard first to avoid double capture.
+Restarting the server from a different directory is safe; deleting the
+`.budgetpilot/` directory loses the local order verification records.
 
 ## Source attribution / ownership
 
@@ -52,5 +72,5 @@ existing branches and PRs. Refresh code from teammates if they push new commits.
 
 - Run live Gemini samples, including ambiguous/missing-budget cases.
 - Test that quantity edits invalidate prior checkout approval/order state.
-- Finish PayPal order approval return, capture, and amount verification.
+- Complete a real Sandbox buyer approval/capture smoke test and verify the exact total in the Sandbox dashboard.
 - Rotate API secrets exposed in earlier git history.
