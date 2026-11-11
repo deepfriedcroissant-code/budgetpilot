@@ -15,17 +15,20 @@ def build_sidebar_summary(request, cart, catalog, cart_valid, checkout_enabled, 
             "percent": 0, "over_budget": False, "cart_valid": False,
             "checkout_enabled": bool(checkout_enabled), "stage": 0,
         }
-    from paypal_api import calculate_total
-
     try:
         budget = Decimal(str(request["budget"]))
         if not budget.is_finite() or budget <= 0:
             raise ValueError("Invalid shopping budget")
         active_cart = [p for p in (cart or []) if isinstance(p, dict) and
                        type(p.get("quantity")) is int and p["quantity"] > 0]
-        # Stock breaches still need to display their financial total.
-        # Only the checkout validity flag determines whether payment can proceed.
-        total = calculate_total(active_cart, catalog) if active_cart else Decimal("0")
+        # Display a trusted-price total even when stock is exceeded.
+        # The editor's cart_valid flag still prevents checkout.
+        total = Decimal("0")
+        for item in active_cart:
+            price = Decimal(str(catalog[item["id"]]["price"]))
+            if not price.is_finite() or price <= 0:
+                raise ValueError("Invalid catalog price")
+            total += price * item["quantity"]
         products = len({str(item["id"]) for item in active_cart})
         units = sum(item["quantity"] for item in active_cart)
     except (ValueError, KeyError, TypeError, InvalidOperation):
