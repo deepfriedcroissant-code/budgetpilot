@@ -30,13 +30,19 @@ SAMPLE_REQUEST = {
 }
 
 
-def _clear_checkout_state() -> None:
-    """Invalidate stale approvals and orders whenever request/cart changes."""
+def _clear_checkout_state(*, reset_cart_validation: bool = True) -> None:
+    """Invalidate stale PayPal approvals/orders without discarding a fresh cart check.
+
+    render_cart_display() calculates budgetpilot_cart_valid on each run.
+    Clearing it immediately after a cart edit incorrectly blocks checkout
+    until another rerun, even when the updated cart is under budget.
+    """
     for key in list(st.session_state.keys()):
         if key.startswith("checkout_approved_") or key in (
             "checkout_order_result", "checkout_error", "checkout_cart_fp",
+        ) or (reset_cart_validation and key in (
             "budgetpilot_cart_valid", "budgetpilot_cart_changed",
-        ):
+        )):
             st.session_state.pop(key, None)
 
 
@@ -142,7 +148,9 @@ if request is not None:
         recommended, catalog, request["budget"], st.session_state.bp_cart_version
     )
     if edited != st.session_state.bp_current_cart:
-        _clear_checkout_state()
+        # Keep the newly calculated cart validity; only invalidate prior
+        # payment approval and order details when quantities change.
+        _clear_checkout_state(reset_cart_validation=False)
         st.session_state.bp_current_cart = edited
         st.toast("Cart updated", icon="🛒")
 
