@@ -1,49 +1,50 @@
 # BudgetPilot — PayPal AI Hackathon
 
-AI-assisted budget shopping. This branch contains a **temporary integrated
-backend**, not a finished frontend or verified live PayPal payment.
+BudgetPilot converts natural-language shopping needs into an editable,
+budget-aware cart and a PayPal **Sandbox** checkout.
 
-## Backend workflow
+## November 10 release candidate
 
-User message → Gemini `parse_request` → `validate_request` →
-46-product `load_catalog` → `recommend_cart` →
-`calculate_total` → user cart approval → PayPal Sandbox order.
+The combined Streamlit frontend integrates the team components:
+- Gemini shopping-intent parsing (Brigitte) and request validation (Chenfei)
+- 46-product trusted catalog (Set)
+- Quantity-aware, budget/stock-aware optimizer and editable cart (Yashmit)
+- PayPal Sandbox order creation and checkout integration (Andrew + integration)
 
-## Getting started
+**Payment flow:** cart approval → order creation with trusted catalog prices →
+Sandbox buyer approval → return-state check → one-time capture → verify captured
+amount, USD currency, and COMPLETED status.
+
+This branch is for review/testing. It is **not merged into main** and has **not
+yet passed a live buyer-approved Sandbox checkout**.
+
+## Local quickstart
 
 ```bash
 python -m pip install -r requirements.txt
-pytest -q
-python main.py
-streamlit run app.py
+python -m pytest -q
+python scripts/check_gemini.py
+python -m streamlit run app.py
 ```
 
-`python main.py` uses a hardcoded parsed request for an offline smoke demo.
-The current `app.py` is the original mock Streamlit frontend; UI work lives
-in PR #1 and PR #2 and is intentionally not included in this backend PR.
+Create a local `.env` next to `app.py`, using `.env.example` as a guide.
+Use `GEMINI_MODEL=gemini-3.1-flash-lite`. The offline sample button requires
+no Gemini key. Never commit credentials.
 
-To try live Gemini, copy `.env.example` to `.env` (never commit `.env`),
-set your Gemini key, and run:
+PayPal checkout is off unless `BUDGETPILOT_ENABLE_PAYPAL_SANDBOX=1` is set
+locally with valid Sandbox REST credentials and `APP_URL=http://localhost:8501`.
+Always log in using a **Sandbox buyer**, not a real PayPal account.
 
-```python
-from main import build_cart
-request, cart, catalog = build_cart("Snacks and drinks for 20 people under $100")
-print(request, cart)
-```
+See [docs/COMBINED_FRONTEND.md](docs/COMBINED_FRONTEND.md) for the full demo
+procedure, limitations and testing notes.
 
-For a PayPal Sandbox order, use `paypal_api.create_order(cart, catalog,
-budget=request["budget"])` with a trusted catalog; this creates an approval
-URL but does not capture or verify payment.
+## Known release gates
 
-## Important limitations
+- Live Gemini parsing, including missing budget and invalid categories
+- Live Sandbox order approval + capture verification and cancellation
+- Browser rerender/edit state and cart budget/stock constraints
+- All CI tests passing on this release candidate
+- Rotate any previously exposed API keys or sandbox credentials
 
-- MVP optimizer uses a one-of-each-item selection. Group size, multiple
-  quantities, and shopping priorities need Yashmit's next update.
-- The PayPal Sandbox approval/return/capture verification workflow is not
-  finished; no production payments.
-- Live Gemini/PayPal requests were not run by offline unit tests.
-- **Rotate previously committed credentials.** This branch replaces
-  `.env.example` with placeholders; older commits still contain its history.
-
-See [INTEGRATION_NOTES.md](INTEGRATION_NOTES.md) for shared function contracts
-and handoff responsibilities.
+No production charges, live product pricing, shipping, taxes, or inventory
+reservation are implemented. Do not claim production checkout support.
