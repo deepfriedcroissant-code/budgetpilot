@@ -45,10 +45,33 @@ div[data-testid="stVerticalBlockBorderWrapper"]:hover {
 .bp-product-name { font-weight: 700; font-size: 1.04rem; min-height: 2.4rem; color:#f2f6ff; }
 .bp-muted { font-size:.84rem; color: #aec1db; }
 .bp-price { font-size:1.45rem; font-weight:750; color:#8cbdff; padding:.45rem 0; }
+/* Shopping sidebar: glanceable summary and restrained micro-interactions. */
+.bp-side-status {
+  display:inline-flex; border-radius:999px; font-size:.78rem;
+  font-weight:700; padding:.28rem .7rem; margin:.4rem 0 .85rem;
+  border:1px solid #405573; color:#dce9ff; background:#21324d;
+}
+.bp-status-good { background:#153d33; color:#8de1bc; border-color:#2e755e; }
+.bp-status-alert { background:#49272d; color:#ffb1b1; border-color:#89525b; }
+.bp-side-total { font-size:1.65rem; font-weight:800; letter-spacing:-.045em; color:#f4f8ff; }
+.bp-side-total span { font-size:.95rem; font-weight:500; color:#aec1db; letter-spacing:0; }
+.bp-step-row {
+  display:flex; align-items:center; gap:.68rem; margin:.58rem 0;
+  padding:.45rem .65rem; border-radius:.55rem;
+  font-size:.91rem; background:transparent;
+}
+.bp-step-row span:first-child { width:1.1rem; text-align:center; font-weight:900; }
+.bp-step-done { color:#92d8b6; }
+.bp-step-active { color:#dbeafe; background:#233a5e; }
+.bp-step-pending { color:#8498b4; }
+section[data-testid="stSidebar"] div[data-testid="stProgress"] [role="progressbar"] > div {
+  transition:width .28s ease;
+}
 @keyframes bp-pop { 0%{transform:scale(.97);opacity:.45} 100%{transform:scale(1);opacity:1} }
 .bp-pop { animation:bp-pop .3s ease-out; }
 @media(prefers-reduced-motion:reduce){
  .bp-pop { animation:none; }
+ section[data-testid="stSidebar"] div[data-testid="stProgress"] [role="progressbar"] > div { transition:none; }
  div[data-testid="stVerticalBlockBorderWrapper"] { transition:none; }
  div[data-testid="stVerticalBlockBorderWrapper"]:hover { transform:none; }
 }
