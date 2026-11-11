@@ -19,6 +19,7 @@ from ui.request_feedback import render_request_feedback
 from ui.product_display import render_product_display
 from ui.cart_display import render_cart_display
 from ui.theme import apply_theme
+from ui.shopping_dashboard import build_sidebar_summary, render_shopping_dashboard
 
 st.set_page_config(page_title="BudgetPilot | AI Shopping Assistant", page_icon="🛒", layout="wide")
 
@@ -40,6 +41,7 @@ def _clear_checkout_state(*, reset_cart_validation: bool = True) -> None:
     for key in list(st.session_state.keys()):
         if key.startswith("checkout_approved_") or key in (
             "checkout_order_result", "checkout_error", "checkout_cart_fp",
+            "bp_payment_verified",
         ) or (reset_cart_validation and key in (
             "budgetpilot_cart_valid", "budgetpilot_cart_changed",
         )):
@@ -92,15 +94,6 @@ st.markdown(
     'discover a personalized cart, and check out with confidence.</p></div>',
     unsafe_allow_html=True,
 )
-
-with st.sidebar:
-    st.header("Your shopping journey")
-    st.markdown("**1.** Describe what you need")
-    st.markdown("**2.** Discover recommendations")
-    st.markdown("**3.** Personalize your cart")
-    st.markdown("**4.** Check out with PayPal")
-    st.divider()
-    st.caption("Payments are processed in the PayPal Sandbox demonstration environment.")
 
 st.divider()
 st.subheader("1 · Your shopping request")
@@ -200,6 +193,7 @@ if payment == "success":
                     "dashboard before attempting another capture."
                 )
             else:
+                st.session_state.bp_payment_verified = True
                 st.success(
                     f"Sandbox payment verified: order `{result['order_id']}` · "
                     f"capture `{result['capture_id']}` · USD ${result['total']} · COMPLETED"
@@ -207,3 +201,19 @@ if payment == "success":
 elif payment == "cancelled":
     st.query_params.clear()
     st.warning("PayPal Sandbox checkout was cancelled. No completed payment is recorded.")
+
+# Render the sidebar *after* the cart controls on each Streamlit rerun.
+# This ensures its totals and checkout status reflect the current edited cart.
+active_request = st.session_state.bp_request
+summary = build_sidebar_summary(
+    active_request,
+    st.session_state.bp_current_cart,
+    st.session_state.bp_catalog,
+    st.session_state.get("budgetpilot_cart_valid", False),
+    os.getenv("BUDGETPILOT_ENABLE_PAYPAL_SANDBOX") == "1",
+    order_created=bool(st.session_state.get("checkout_order_result")),
+)
+render_shopping_dashboard(
+    summary,
+    people=active_request.get("people") if active_request else None,
+)
