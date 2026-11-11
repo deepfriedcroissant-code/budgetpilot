@@ -18,6 +18,7 @@ from ui.request_input import render_request_input
 from ui.request_feedback import render_request_feedback
 from ui.product_display import render_product_display
 from ui.cart_display import render_cart_display
+from ui.theme import apply_theme
 
 st.set_page_config(page_title="BudgetPilot | AI Shopping Assistant", page_icon="🛒", layout="wide")
 
@@ -78,30 +79,27 @@ for key, value in (
     if key not in st.session_state:
         st.session_state[key] = value
 
-st.title("BudgetPilot")
-
-
-
-st.caption("AI-assisted shopping that respects your budget. · Nov 10 release candidate")
+apply_theme()
 st.markdown(
-    "Describe your shopping needs, review real catalog recommendations, "
-    "and adjust your cart before checkout."
+    '<div class="bp-hero"><h1>BudgetPilot</h1>'
+    '<p>Smart shopping, made for your budget. Tell us what you need, '
+    'discover a personalized cart, and check out with confidence.</p></div>',
+    unsafe_allow_html=True,
 )
 
 with st.sidebar:
-    st.header("Integration status")
-    st.success("Catalog + validation + optimizer connected")
-    st.info("Live Gemini requires GEMINI_API_KEY in your local environment.")
-    st.info("PayPal Sandbox checkout requires explicit local opt-in and Sandbox credentials.")
-    st.caption("This preview uses the team's Streamlit components.")
+    st.header("Your shopping journey")
+    st.markdown("**1.** Describe what you need")
+    st.markdown("**2.** Discover recommendations")
+    st.markdown("**3.** Personalize your cart")
+    st.markdown("**4.** Check out with PayPal")
+    st.divider()
+    st.caption("Payments are processed in the PayPal Sandbox demonstration environment.")
 
 st.divider()
 st.subheader("1 · Your shopping request")
-st.caption(
-    "Use Brigitte's form for Gemini parsing, or choose the offline sample "
-    "to test the end-to-end cart UI without credentials."
-)
-sample_clicked = st.button("Try sample: snacks + drinks for 20 people, $100", type="secondary")
+st.caption("Set a budget, choose what matters, and let BudgetPilot do the planning.")
+sample_clicked = st.button("Try an example shopping trip · $100 for 20 people", type="secondary")
 parsed, parse_error = render_request_input()
 
 if sample_clicked:
@@ -130,7 +128,7 @@ if request is not None:
     catalog = st.session_state.bp_catalog
     recommended = st.session_state.bp_recommendations
     st.divider()
-    st.subheader("2 · Your recommended products")
+    st.subheader("2 · Picks for you")
     st.caption(
         f"Budget: ${request['budget']:,.2f}  ·  "
         f"People: {request.get('people') or 'Not specified'}  ·  "
@@ -139,7 +137,7 @@ if request is not None:
     render_product_display(recommended, catalog, layout="cards", columns=3)
 
     st.divider()
-    st.subheader("3 · Adjust quantities & budget")
+    st.subheader("3 · Make it yours")
     edited = render_cart_display(
         recommended, catalog, request["budget"], st.session_state.bp_cart_version
     )
@@ -149,7 +147,7 @@ if request is not None:
 
     valid = bool(st.session_state.get("budgetpilot_cart_valid", False))
     st.divider()
-    st.subheader("4 · Checkout")
+    st.subheader("4 · Secure checkout")
     if not valid:
         st.warning("Adjust the cart to stay within budget and stock before checkout.")
     if os.getenv("BUDGETPILOT_ENABLE_PAYPAL_SANDBOX") == "1":
@@ -159,19 +157,14 @@ if request is not None:
             edited, catalog, budget=request["budget"],
             cart_valid=valid, cart_version=st.session_state.bp_cart_version,
         )
-        st.caption(
-            "Sandbox only. An order is not paid until PayPal returns a verified COMPLETED capture."
-        )
+        st.caption("Demo checkout · PayPal Sandbox · No real charges")
     else:
         if valid:
             st.success("Your cart is ready for checkout.")
-        st.button("PayPal Sandbox checkout — available after integration", disabled=True)
-        st.caption(
-            "Sandbox calls are intentionally off in this combined frontend "
-            "until payment-return and capture verification are tested."
-        )
+        st.button("Checkout unavailable", disabled=True)
+        st.caption("Checkout isn't available in this session. Your cart is still saved above.")
 else:
-    st.info("Enter a request or try the sample above to see product recommendations.")
+    st.info("Describe what you need above to discover your personalized cart.")
 
 # PayPal redirects the buyer back with token=ORDER_ID after approval.
 # A fresh Streamlit session is fine: the local SQLite record binds order and nonce.
