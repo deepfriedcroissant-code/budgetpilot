@@ -1,4 +1,6 @@
 import os
+import secrets
+from urllib.parse import urlencode
 from decimal import Decimal, ROUND_HALF_UP
 import requests
 from dotenv import load_dotenv
@@ -61,11 +63,18 @@ def calculate_total(cart: list[dict], catalog) -> Decimal:
     return total.quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
 
 
+def _require_sandbox():
+    """This hackathon application must never initiate production payments."""
+    if PAYPAL_BASE_URL.rstrip("/") != "https://api-m.sandbox.paypal.com":
+        raise RuntimeError("Only PayPal Sandbox is supported by BudgetPilot.")
+
+
 def get_access_token() -> str:
     """
     Authenticates with PayPal Sandbox OAuth2 API using .env credentials
     and returns a Bearer access token.
     """
+    _require_sandbox()
     if not PAYPAL_CLIENT_ID or not PAYPAL_CLIENT_SECRET:
         raise EnvironmentError(
             "Missing PayPal credentials! Ensure PAYPAL_CLIENT_ID and "
@@ -128,6 +137,7 @@ def create_order(approved_cart: list[dict], catalog, currency: str = "USD", budg
             }
         )
 
+    return_state = secrets.token_urlsafe(32)
     payload = {
         "intent": "CAPTURE",
         "purchase_units": [
@@ -149,8 +159,8 @@ def create_order(approved_cart: list[dict], catalog, currency: str = "USD", budg
         "application_context": {
             "brand_name": "BudgetPilot",
             "user_action": "PAY_NOW",
-            "return_url": f"{APP_URL}/?payment=success",
-            "cancel_url": f"{APP_URL}/?payment=cancelled",
+            "return_url": f"{APP_URL.rstrip('/')}/?{urlencode({'payment': 'success', 'state': return_state})}",
+            "cancel_url": f"{APP_URL.rstrip('/')}/?payment=cancelled",
         },
     }
 
@@ -181,6 +191,7 @@ def create_order(approved_cart: list[dict], catalog, currency: str = "USD", budg
         "status": data.get("status"),
         "total": str(validated_total),
         "approval_url": approval_url,
+        "return_state": return_state,
     }
 
 
@@ -203,9 +214,21 @@ def capture_order(order_id: str) -> dict:
         )
 
     data = response.json()
+    captures = [
+        capture
+        for unit in data.get("purchase_units", [])
+        for capture in unit.get("payments", {}).get("captures", [])
+    ]
+    if len(captures) != 1:
+        raise RuntimeError("PayPal response did not contain exactly one capture; verify in Sandbox.")
+    capture = captures[0]
+    amount = capture.get("amount") or {}
     return {
         "order_id": data.get("id"),
-        "status": data.get("status"),
+        "status": capture.get("status"),
+        "total": amount.get("value"),
+        "currency": amount.get("currency_code"),
+        "capture_id": capture.get("id"),
     }
 
 
