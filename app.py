@@ -5,6 +5,7 @@ PayPal Sandbox remains opt-in and capture is verified against saved orders.
 Run: streamlit run app.py
 """
 import os
+import logging
 from decimal import Decimal
 from dotenv import load_dotenv
 
@@ -21,6 +22,8 @@ from ui.cart_display import render_cart_display
 from ui.theme import apply_theme
 from ui.shopping_dashboard import build_sidebar_summary, render_shopping_dashboard
 from shopping_assistant import suggest_budget_repair
+
+logger = logging.getLogger("budgetpilot.checkout")
 
 st.set_page_config(page_title="BudgetPilot | AI Shopping Assistant", page_icon="🛒", layout="wide")
 
@@ -118,12 +121,16 @@ if payment == "success":
         with st.spinner("Verifying and capturing your PayPal Sandbox order..."):
             try:
                 result = finalize_return(token, state, capture_order)
-            except Exception:
-                # A capture may have reached PayPal even if confirmation failed.
-                # Do NOT retry automatically; inspect the order in PayPal Sandbox.
+            except Exception as exc:
+                # Detailed reasons stay in the server log; never expose return-state
+                # nonces, API credentials, raw PayPal JSON, or bearer tokens in the UI.
+                # The order may already have been captured: NEVER retry automatically.
+                logger.exception("Sandbox checkout verification failed for order %s", token)
+                st.session_state.bp_payment_return_order = token
                 st.session_state.bp_payment_return_error = (
-                    "Payment could not be verified. Check the order in the PayPal Sandbox "
-                    "dashboard before attempting another capture."
+                    "Payment verification failed during the PayPal capture step."
+                    if isinstance(exc, (RuntimeError, ValueError))
+                    else "Payment verification failed because of a server or connection error."
                 )
             else:
                 st.session_state.bp_payment_verified = True
@@ -159,8 +166,17 @@ if st.session_state.get("bp_verified_receipt"):
         st.caption("Your payment was verified in PayPal Sandbox.")
     st.stop()
 
-if st.session_state.pop("bp_payment_return_error", None):
-    st.warning("Payment has not been confirmed. Please check the PayPal Sandbox order status before retrying.")
+payment_error = st.session_state.pop("bp_payment_return_error", None)
+if payment_error:
+    st.warning(payment_error)
+    st.info(
+        "We cannot confirm whether PayPal completed the capture. Check the "
+        "order in your PayPal Sandbox dashboard before creating another payment. "
+        "The VS Code terminal contains the specific failure reason."
+    )
+    failed_order = st.session_state.pop("bp_payment_return_order", None)
+    if failed_order:
+        st.caption(f"PayPal Sandbox order reference: {failed_order}")
 
 st.divider()
 st.subheader("1 · Your shopping request")
