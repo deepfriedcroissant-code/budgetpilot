@@ -116,25 +116,40 @@ if payment == "success":
     elif not token or not state:
         st.session_state.bp_payment_return_error = "PayPal returned without the expected order token and verification state."
     else:
-        from paypal_api import capture_order
-        from checkout_flow import finalize_return
-        with st.spinner("Verifying and capturing your PayPal Sandbox order..."):
+        from paypal_api import capture_order, get_order_status
+        from checkout_flow import finalize_return, get_order, check_payment_status
+        with st.spinner("Checking your PayPal Sandbox payment..."):
             try:
-                result = finalize_return(token, state, capture_order)
+                existing = get_order(token, state)
+                if existing is None:
+                    raise ValueError("Unknown or invalid checkout return state.")
+                if existing["status"] == "CREATED":
+                    result = finalize_return(token, state, capture_order)
+                else:
+                    # A return can occur more than once. Never capture twice.
+                    result = check_payment_status(token, state, get_order_status)
             except Exception as exc:
-                # Detailed reasons stay in the server log; never expose return-state
-                # nonces, API credentials, raw PayPal JSON, or bearer tokens in the UI.
-                # The order may already have been captured: NEVER retry automatically.
                 logger.exception("Sandbox checkout verification failed for order %s", token)
                 st.session_state.bp_payment_return_order = token
                 st.session_state.bp_payment_return_error = (
-                    "Payment verification failed during the PayPal capture step."
+                    "Payment verification is unresolved. No second capture was attempted."
                     if isinstance(exc, (RuntimeError, ValueError))
-                    else "Payment verification failed because of a server or connection error."
+                    else "Unable to check PayPal Sandbox right now."
                 )
             else:
-                st.session_state.bp_payment_verified = True
-                st.session_state.bp_verified_receipt = result
+                if result["status"] == "COMPLETED":
+                    st.session_state.bp_payment_verified = True
+                    st.session_state.bp_verified_receipt = result
+                    st.session_state.pop("bp_pending_payment", None)
+                else:
+                    st.session_state.bp_pending_payment = {
+                        "order_id": token,
+                        "state": state,
+                        "status": result["status"],
+                        "capture_id": result.get("capture_id"),
+                        "total": result.get("total"),
+                        "reason": result.get("reason"),
+                    }
 elif payment == "cancelled":
     st.query_params.clear()
     st.session_state.bp_payment_return_error = "PayPal Sandbox checkout was cancelled. No completed payment is recorded."
@@ -150,6 +165,51 @@ st.markdown(
 
 # A confirmed payment has its own final screen, including after a redirect
 # opens a fresh Streamlit session. Do not render checkout again for this order.
+if st.session_state.get("bp_pending_payment"):
+    from paypal_api import get_order_status
+    from checkout_flow import check_payment_status
+    pending = st.session_state.bp_pending_payment
+    st.markdown("## Payment status")
+    if pending["status"] == "PENDING":
+        st.warning("Payment pending — PayPal has received the capture, but it is not yet completed.")
+        if pending.get("reason") == "PENDING_REVIEW":
+            st.info("PayPal is reviewing this Sandbox payment. You do not need to pay again.")
+    elif pending["status"] == "UNSUCCESSFUL":
+        st.error("PayPal reports the capture was unsuccessful. Check the Sandbox merchant account.")
+    else:
+        st.warning("Payment verification is still unresolved. Please check the existing order.")
+    st.caption(f"Order reference: {pending['order_id']}")
+    if pending.get("capture_id"):
+        st.caption(f"Capture reference: {pending['capture_id']}")
+    if pending.get("total"):
+        st.metric("Submitted Sandbox amount", f"USD ${pending['total']}")
+    if st.button("Check payment status", type="primary"):
+        try:
+            refreshed = check_payment_status(
+                pending["order_id"], pending["state"], get_order_status
+            )
+        except Exception:
+            logger.exception("Read-only Sandbox status lookup failed")
+            st.error("PayPal status could not be checked. No new payment was initiated.")
+        else:
+            if refreshed["status"] == "COMPLETED":
+                st.session_state.bp_verified_receipt = refreshed
+                st.session_state.bp_payment_verified = True
+                st.session_state.pop("bp_pending_payment", None)
+            else:
+                pending.update({
+                    "status": refreshed["status"],
+                    "capture_id": refreshed.get("capture_id", pending.get("capture_id")),
+                    "total": refreshed.get("total", pending.get("total")),
+                    "reason": refreshed.get("reason", pending.get("reason")),
+                })
+            st.rerun()
+    st.caption("Status checks are read-only. BudgetPilot will not capture this order again.")
+    with st.sidebar:
+        st.warning("Payment pending")
+        st.caption("Waiting for PayPal Sandbox verification.")
+    st.stop()
+
 if st.session_state.get("bp_verified_receipt"):
     from ui.order_confirmation import render_verified_confirmation
     render_verified_confirmation(st.session_state.bp_verified_receipt)
