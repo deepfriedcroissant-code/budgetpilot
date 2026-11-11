@@ -6,7 +6,7 @@ from decimal import Decimal, InvalidOperation
 import streamlit as st
 
 
-def build_sidebar_summary(request, cart, catalog, cart_valid, checkout_enabled, order_created=False):
+def build_sidebar_summary(request, cart, catalog, cart_valid, checkout_enabled, order_created=False, payment_verified=False):
     """Pure, testable model used by the customer-facing shopping dashboard."""
     if not request or catalog is None:
         return {
@@ -42,7 +42,7 @@ def build_sidebar_summary(request, cart, catalog, cart_valid, checkout_enabled, 
     remaining = budget - total
     percent = max(0, (total / budget) * 100)
     valid = bool(cart_valid) and bool(active_cart) and total <= budget
-    stage = 4 if order_created else (3 if valid else (2 if active_cart else 1))
+    stage = 5 if payment_verified else (4 if order_created else (3 if valid else (2 if active_cart else 1)))
     return {
         "has_request": True, "budget": budget, "total": total,
         "remaining": remaining, "units": units, "products": products,
@@ -69,10 +69,11 @@ def render_shopping_dashboard(summary, people=None):
         over = summary["over_budget"]
         status = (
             "Over budget" if over
+            else "Checkout complete" if summary["stage"] == 5
             else "Cart ready" if summary["cart_valid"]
             else "Review your cart"
         )
-        status_class = "bp-status-alert" if over else ("bp-status-good" if summary["cart_valid"] else "bp-status-idle")
+        status_class = "bp-status-alert" if over else ("bp-status-good" if summary["cart_valid"] or summary["stage"] == 5 else "bp-status-idle")
         st.markdown(
             f'<div class="bp-side-status {status_class}">{status}</div>',
             unsafe_allow_html=True,
@@ -118,6 +119,8 @@ def render_shopping_dashboard(summary, people=None):
             )
         if not summary["checkout_enabled"]:
             st.caption("Checkout is unavailable in this session.")
+        elif summary["stage"] == 5:
+            st.caption("Sandbox checkout completed successfully.")
         elif summary["cart_valid"]:
             st.caption("Review the total below, then proceed to checkout.")
         else:
