@@ -22,3 +22,12 @@ def test_main_shopping_screen_omits_internal_integration_labels():
     ):
         assert text not in code
     assert "PayPal Sandbox" in code
+
+
+def test_dark_theme_has_readable_contrast():
+    from ui.theme import STYLES
+    config = (Path(__file__).parents[1] / ".streamlit" / "config.toml").read_text(encoding="utf-8")
+    assert 'base = "dark"' in config
+    assert 'textColor = "#F2F6FF"' in config
+    assert "#0e1420" in STYLES
+    assert "#f2f6ff" in STYLES.lower()
