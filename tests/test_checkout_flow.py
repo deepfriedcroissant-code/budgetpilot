@@ -136,9 +136,9 @@ def test_readonly_paypal_status_fetch_never_posts(monkeypatch):
                         "status_details": {"reason": "PENDING_REVIEW"},
                         "amount": {"value": "9.00", "currency_code": "USD"},
                     }]}}]}
-    with patch("paypal_api.get_access_token", return_value="FAKE"), \\
-         patch("paypal_api.requests.get", return_value=Response()) as get, \\
-         patch("paypal_api.requests.post") as post:
+    with (patch("paypal_api.get_access_token", return_value="FAKE"),
+          patch("paypal_api.requests.get", return_value=Response()) as get,
+          patch("paypal_api.requests.post") as post):
         result = paypal_api.get_order_status("ORDER-TEST")
     assert result["status"] == "PENDING"
     assert result["reason"] == "PENDING_REVIEW"
