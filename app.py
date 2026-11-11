@@ -1,7 +1,7 @@
-"""BudgetPilot combined Streamlit frontend — pre-PayPal integration candidate.
+"""BudgetPilot combined Streamlit frontend — November 10 release candidate.
 
 This app combines team UI components against the shared backend contracts.
-PayPal sandbox order creation is DISABLED by default until intentionally enabled.
+PayPal Sandbox remains opt-in and capture is verified against saved orders.
 Run: streamlit run app.py
 """
 import os
@@ -82,7 +82,7 @@ st.title("BudgetPilot")
 
 
 
-st.caption("AI-assisted shopping that respects your budget. · Integration preview")
+st.caption("AI-assisted shopping that respects your budget. · Nov 10 release candidate")
 st.markdown(
     "Describe your shopping needs, review real catalog recommendations, "
     "and adjust your cart before checkout."
@@ -92,7 +92,7 @@ with st.sidebar:
     st.header("Integration status")
     st.success("Catalog + validation + optimizer connected")
     st.info("Live Gemini requires GEMINI_API_KEY in your local environment.")
-    st.warning("PayPal Sandbox disabled until checkout verification.")
+    st.info("PayPal Sandbox checkout requires explicit local opt-in and Sandbox credentials.")
     st.caption("This preview uses the team's Streamlit components.")
 
 st.divider()
@@ -160,8 +160,7 @@ if request is not None:
             cart_valid=valid, cart_version=st.session_state.bp_cart_version,
         )
         st.caption(
-            "Sandbox order creation is not completed payment. "
-            "Return, capture and verification remain to be implemented."
+            "Sandbox only. An order is not paid until PayPal returns a verified COMPLETED capture."
         )
     else:
         if valid:
@@ -174,22 +173,35 @@ if request is not None:
 else:
     st.info("Enter a request or try the sample above to see product recommendations.")
 
-# Catch PayPal Sandbox return redirects (?payment=success&token=ORDER_ID)
-if st.query_params.get("payment") == "success" and st.query_params.get("token"):
+# PayPal redirects the buyer back with token=ORDER_ID after approval.
+# A fresh Streamlit session is fine: the local SQLite record binds order and nonce.
+payment = st.query_params.get("payment")
+if payment == "success":
     token = st.query_params.get("token")
-    from paypal_api import capture_order
-    with st.spinner(f"Capturing PayPal Sandbox payment for Order {token}..."):
-        try:
-            captured = capture_order(token)
-            st.session_state["last_captured_order"] = captured
-            st.query_params.clear()
-        except Exception as exc:
-            st.error(f"PayPal capture failed: {exc}")
-            st.query_params.clear()
-
-if "last_captured_order" in st.session_state:
-    cap = st.session_state["last_captured_order"]
-    st.success(
-        f"🎉 **Payment Completed & Captured!** "
-        f"Order ID: `{cap.get('order_id')}` · Status: `{cap.get('status')}`"
-    )
+    state = st.query_params.get("state")
+    st.query_params.clear()
+    if os.getenv("BUDGETPILOT_ENABLE_PAYPAL_SANDBOX") != "1":
+        st.error("Sandbox checkout is disabled; no capture was attempted.")
+    elif not token or not state:
+        st.error("PayPal returned without the expected order token and verification state.")
+    else:
+        from paypal_api import capture_order
+        from checkout_flow import finalize_return
+        with st.spinner("Verifying and capturing your PayPal Sandbox order..."):
+            try:
+                result = finalize_return(token, state, capture_order)
+            except Exception:
+                # A capture may have reached PayPal even if confirmation failed.
+                # Do NOT retry automatically; inspect the order in PayPal Sandbox.
+                st.error(
+                    "Payment could not be verified. Check the order in the PayPal Sandbox "
+                    "dashboard before attempting another capture."
+                )
+            else:
+                st.success(
+                    f"Sandbox payment verified: order `{result['order_id']}` · "
+                    f"capture `{result['capture_id']}` · USD ${result['total']} · COMPLETED"
+                )
+elif payment == "cancelled":
+    st.query_params.clear()
+    st.warning("PayPal Sandbox checkout was cancelled. No completed payment is recorded.")
