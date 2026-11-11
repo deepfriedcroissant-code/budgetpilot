@@ -20,6 +20,7 @@ from ui.product_display import render_product_display
 from ui.cart_display import render_cart_display
 from ui.theme import apply_theme
 from ui.shopping_dashboard import build_sidebar_summary, render_shopping_dashboard
+from shopping_assistant import suggest_budget_repair
 
 st.set_page_config(page_title="BudgetPilot | AI Shopping Assistant", page_icon="🛒", layout="wide")
 
@@ -133,7 +134,7 @@ if request is not None:
         f"People: {request.get('people') or 'Not specified'}  ·  "
         f"Priority: {request.get('priority') or 'variety'}"
     )
-    render_product_display(recommended, catalog, layout="cards", columns=3)
+    render_product_display(recommended, catalog, layout="cards", columns=3, request=request)
 
     st.divider()
     st.subheader("3 · Make it yours")
@@ -148,6 +149,32 @@ if request is not None:
         st.toast("Cart updated", icon="🛒")
 
     valid = bool(st.session_state.get("budgetpilot_cart_valid", False))
+    if edited and not valid:
+        st.markdown("#### Make your cart fit")
+        st.caption("We'll suggest quantity changes using catalog prices and available stock. Nothing changes until you apply them.")
+        try:
+            proposed_cart, proposed_changes = suggest_budget_repair(
+                edited, catalog, request["budget"]
+            )
+        except (ValueError, TypeError, KeyError) as exc:
+            st.warning(f"Automatic adjustment isn't available: {exc}")
+        else:
+            if proposed_cart and proposed_changes:
+                st.info("Suggested changes: " + "; ".join(proposed_changes))
+                st.caption(f"Proposed new total: ${calculate_total(proposed_cart, catalog):,.2f}")
+                if st.button("Apply suggested changes", type="secondary"):
+                    # The cart editor uses quantity widgets keyed by recommendation
+                    # version. Update those widgets before the next rerun; the cart
+                    # editor then revalidates, and checkout approval is invalidated.
+                    proposed_quantities = {p["id"]: p["quantity"] for p in proposed_cart}
+                    for original in recommended:
+                        st.session_state[
+                            f"cart_{st.session_state.bp_cart_version}_{original['id']}"
+                        ] = proposed_quantities.get(original["id"], 0)
+                    _clear_checkout_state(reset_cart_validation=False)
+                    st.rerun()
+            elif not proposed_cart:
+                st.warning("No products can fit this budget. Try a different shopping request.")
     st.divider()
     st.subheader("4 · Secure checkout")
     if not valid:
