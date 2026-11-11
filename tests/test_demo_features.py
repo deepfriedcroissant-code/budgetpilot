@@ -72,3 +72,16 @@ def test_ui_budget_repair_requires_explicit_apply_and_keeps_cart_checks():
 def test_reduced_motion_covers_payment_success_animation():
     from ui.theme import STYLES
     assert ".bp-success-icon { animation:none; }" in STYLES
+
+
+def test_product_card_renderer_receives_catalog_for_explanations():
+    import ast
+    source = (Path(__file__).parents[1] / "ui" / "product_display.py").read_text(encoding="utf-8")
+    tree = ast.parse(source)
+    fn = next(node for node in tree.body
+              if isinstance(node, ast.FunctionDef) and node.name == "_render_cards")
+    assert "catalog" in [arg.arg for arg in fn.args.args]
+    calls = [node for node in ast.walk(tree) if isinstance(node, ast.Call)
+             and isinstance(node.func, ast.Name) and node.func.id == "_render_cards"]
+    assert calls
+    assert all("catalog" in [kw.arg for kw in call.keywords] for call in calls)
