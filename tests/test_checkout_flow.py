@@ -66,6 +66,15 @@ def test_unverified_capture_never_marks_complete(tmp_path, total, currency, stat
         finalize_return("ORDER-TEST", "a" * 40, capture, db)
 
 
+def test_mismatched_captured_order_never_marks_complete(tmp_path):
+    db = tmp_path / "state.db"
+    record_order(_order(), db)
+    result = {**_captured("OTHER-ORDER")}
+    with pytest.raises(ValueError, match="order ID"):
+        finalize_return("ORDER-TEST", "a" * 40, lambda _: result, db)
+    assert get_order("ORDER-TEST", "a" * 40, db)["status"] == "CAPTURING"
+
+
 def test_unrecognized_order_never_captures(tmp_path):
     with pytest.raises(ValueError, match="Unrecognized"):
         finalize_return("FORGED", "a" * 40, lambda _: pytest.fail("capture should not run"), tmp_path / "db.sqlite")
