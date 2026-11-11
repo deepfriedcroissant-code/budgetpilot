@@ -132,11 +132,11 @@ def render_product_display(cart, catalog, layout="cards", show_quantity=True,
     if layout == "table":
         _render_table(st, rows, show_quantity)
     else:
-        _render_cards(st, rows, show_quantity, columns, request=request)
+        _render_cards(st, rows, show_quantity, columns, request=request, catalog=_normalize_catalog(catalog))
     return rows
 
 
-def _render_cards(st, rows, show_quantity, columns, request=None):
+def _render_cards(st, rows, show_quantity, columns, request=None, catalog=None):
     for start in range(0, len(rows), columns):
         cols = st.columns(columns)
         for col, row in zip(cols, rows[start:start + columns]):
