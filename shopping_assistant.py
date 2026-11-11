@@ -22,7 +22,7 @@ def explain_recommendation(product, request):
         reasons.append("adds another option to your suggested selection")
     if request.get("people"):
         reasons.append("was considered for your group shopping request")
-    return "Selected because it " + ", and ".join(reasons[:2]) + "."
+    return "Selected because it " + ", and ".join(reasons) + "."
 
 
 def suggest_budget_repair(cart, catalog, budget):
