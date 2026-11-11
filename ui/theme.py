@@ -67,10 +67,26 @@ div[data-testid="stVerticalBlockBorderWrapper"]:hover {
 section[data-testid="stSidebar"] div[data-testid="stProgress"] [role="progressbar"] > div {
   transition:width .28s ease;
 }
+/* Verified checkout completion: subdued, accessible celebratory feedback. */
+.bp-success {
+  text-align:center; padding:2.25rem 1.5rem; margin:1rem 0 1.3rem;
+  border-radius:22px; border:1px solid #2b695b;
+  background:linear-gradient(145deg,#142d35,#172b46);
+}
+.bp-success-icon {
+  width:4rem; height:4rem; display:grid; place-items:center;
+  margin:0 auto .9rem; font-size:2.15rem; font-weight:800;
+  color:#a7f3cf; background:#1b4a3e; border-radius:999px;
+  animation:bp-check .38s ease-out both;
+}
+.bp-success h2 { color:#fff; font-size:1.8rem; margin:0 0 .35rem; }
+.bp-success p { color:#b7cee3; margin:0; }
+@keyframes bp-check { from { opacity:.4; transform:scale(.8); } to {opacity:1;transform:scale(1);} }
 @keyframes bp-pop { 0%{transform:scale(.97);opacity:.45} 100%{transform:scale(1);opacity:1} }
 .bp-pop { animation:bp-pop .3s ease-out; }
 @media(prefers-reduced-motion:reduce){
  .bp-pop { animation:none; }
+ .bp-success-icon { animation:none; }
  section[data-testid="stSidebar"] div[data-testid="stProgress"] [role="progressbar"] > div { transition:none; }
  div[data-testid="stVerticalBlockBorderWrapper"] { transition:none; }
  div[data-testid="stVerticalBlockBorderWrapper"]:hover { transform:none; }
