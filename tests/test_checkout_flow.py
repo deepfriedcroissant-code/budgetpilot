@@ -201,3 +201,36 @@ def test_production_paypal_blocked(monkeypatch):
     monkeypatch.setattr(paypal_api, "PAYPAL_BASE_URL", "https://api-m.paypal.com")
     with pytest.raises(RuntimeError, match="Sandbox"):
         paypal_api.get_access_token()
+
+
+def test_pending_order_remains_pending_when_status_is_unchanged(tmp_path):
+    db = tmp_path / "state.db"
+    record_order(_order(), db)
+    pending = {**_captured("ORDER-TEST"), "status": "PENDING", "reason": "PENDING_REVIEW"}
+    finalize_return("ORDER-TEST", "a" * 40, lambda _: pending, db)
+    refreshed = check_payment_status("ORDER-TEST", "a" * 40, lambda _: pending, db)
+    assert refreshed["status"] == "PENDING"
+    assert refreshed["reason"] == "PENDING_REVIEW"
+    assert get_order("ORDER-TEST", "a" * 40, db)["status"] == "PENDING"
+
+
+def test_pending_status_lookup_cannot_use_wrong_nonce(tmp_path):
+    db = tmp_path / "state.db"
+    record_order(_order(), db)
+    finalize_return("ORDER-TEST", "a" * 40, lambda _: {
+        **_captured("ORDER-TEST"), "status": "PENDING"
+    }, db)
+    with pytest.raises(ValueError, match="not recognized"):
+        check_payment_status("ORDER-TEST", "b" * 40,
+                             lambda _: pytest.fail("must not query PayPal"), db)
+
+
+def test_pending_payment_interface_blocks_duplicate_checkout():
+    from pathlib import Path
+    source = (Path(__file__).parents[1] / "app.py").read_text(encoding="utf-8")
+    assert 'if st.session_state.get("bp_pending_payment"):' in source
+    assert 'st.button("Check payment status"' in source
+    pending_start = source.index('if st.session_state.get("bp_pending_payment"):')
+    confirmed_start = source.index('if st.session_state.get("bp_verified_receipt"):')
+    assert "st.stop()" in source[pending_start:confirmed_start]
+    assert "check_payment_status(" in source[pending_start:confirmed_start]
