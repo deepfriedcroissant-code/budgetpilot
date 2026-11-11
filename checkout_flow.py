@@ -63,11 +63,67 @@ def get_order(order_id, state, db_path=None):
     return dict(row) if row is not None else None
 
 
-def finalize_return(order_id, state, capture_fn, db_path=None):
-    """Capture at most once, and display success ONLY after amount/status verification.
+def _record_capture_result(order_id, row, captured, db_path=None):
+    """Verify identity, trusted price and currency before recording PayPal state."""
+    if captured.get("order_id") != order_id:
+        raise ValueError("PayPal order ID mismatch.")
+    capture_id = captured.get("capture_id")
+    if not capture_id:
+        raise ValueError("PayPal response has no capture ID.")
+    if _money(captured.get("total")) != row["amount"] or captured.get("currency") != row["currency"]:
+        raise ValueError("PayPal capture amount/currency mismatch.")
+    if row["capture_id"] and row["capture_id"] != capture_id:
+        raise ValueError("Capture ID changed unexpectedly; manual review required.")
+    status = str(captured.get("status") or "").upper()
+    if status not in {"COMPLETED", "PENDING", "DECLINED", "FAILED", "REFUNDED", "PARTIALLY_REFUNDED"}:
+        raise ValueError("Unrecognized PayPal capture status; review required.")
+    local_status = status if status in {"COMPLETED", "PENDING"} else "UNSUCCESSFUL"
+    with _connect(db_path) as conn:
+        conn.execute(
+            "UPDATE sandbox_orders SET status=?, capture_id=? "
+            "WHERE order_id=? AND status IN ('CAPTURING','PENDING')",
+            (local_status, capture_id, order_id),
+        )
+    return {
+        "order_id": order_id, "status": status, "total": row["amount"],
+        "capture_id": capture_id, "reason": captured.get("reason"),
+    }
 
-    A failed/uncertain capture remains CAPTURING to avoid automatically capturing
-    twice; investigate the order in the PayPal Sandbox dashboard before retrying.
+
+def check_payment_status(order_id, state, lookup_fn, db_path=None):
+    """Read-only PayPal reconciliation. Never sends another capture request.
+
+    Requires the original unpredictable state token and a locally recorded
+    order; the browser cannot ask about arbitrary PayPal orders.
+    """
+    if not order_id or not state:
+        raise ValueError("Order ID and return state are required.")
+    row = get_order(order_id, state, db_path)
+    if row is None:
+        raise ValueError("Order is not recognized by this BudgetPilot session.")
+    if row["status"] == "CREATED":
+        # No capture attempt has been initiated by this app; don't imply payment.
+        return {"order_id": order_id, "status": "NOT_CAPTURED"}
+    if row["status"] == "COMPLETED":
+        return {"order_id": order_id, "status": "COMPLETED",
+                "total": row["amount"], "capture_id": row["capture_id"]}
+    if row["status"] not in {"CAPTURING", "PENDING", "UNSUCCESSFUL"}:
+        raise ValueError("Unexpected stored order status.")
+    observed = lookup_fn(order_id)
+    if observed.get("status") == "NO_CAPTURE":
+        return {"order_id": order_id, "status": "UNRESOLVED"}
+    if row["status"] == "UNSUCCESSFUL":
+        # Terminal failures must not be magically retried or overwritten.
+        return {"order_id": order_id, "status": "UNSUCCESSFUL",
+                "capture_id": row["capture_id"]}
+    return _record_capture_result(order_id, row, observed, db_path)
+
+
+def finalize_return(order_id, state, capture_fn, db_path=None):
+    """Capture once only; pending is an explicit state, not a payment failure.
+
+    Never automatically recaptures when the local state is CAPTURING/PENDING.
+    Such orders are inspected separately with check_payment_status().
     """
     if not order_id or not state:
         raise ValueError("Missing PayPal return token or checkout state.")
@@ -84,27 +140,12 @@ def finalize_return(order_id, state, capture_fn, db_path=None):
         if row["status"] != "CREATED":
             raise ValueError("This order was already submitted for capture. Check Sandbox order status before retrying.")
         updated = conn.execute(
-            "UPDATE sandbox_orders SET status='CAPTURING' WHERE order_id=? AND return_state=? AND status='CREATED'",
+            "UPDATE sandbox_orders SET status='CAPTURING' "
+            "WHERE order_id=? AND return_state=? AND status='CREATED'",
             (order_id, state),
         )
         if updated.rowcount != 1:
             raise ValueError("Another checkout request is processing this order.")
-    # Do not hold a SQLite transaction open across the external network request.
+    # External network call after persistent CAPTURING marker guards retry.
     captured = capture_fn(order_id)
-    if captured.get("order_id") != order_id:
-        raise ValueError("Captured PayPal order ID did not match the approved order.")
-    if str(captured.get("status", "")).upper() != "COMPLETED":
-        raise ValueError("PayPal did not report a completed capture. Check the order in Sandbox.")
-    expected = row["amount"]
-    if _money(captured.get("total")) != expected or captured.get("currency") != row["currency"]:
-        raise ValueError("Captured total/currency does not match the trusted cart. Investigate in Sandbox.")
-    capture_id = captured.get("capture_id")
-    if not capture_id:
-        raise ValueError("PayPal capture response lacked a capture ID.")
-    with _connect(db_path) as conn:
-        conn.execute(
-            "UPDATE sandbox_orders SET status='COMPLETED', capture_id=? WHERE order_id=? AND status='CAPTURING'",
-            (capture_id, order_id),
-        )
-    return {"order_id": order_id, "status": "COMPLETED", "total": expected,
-            "capture_id": capture_id, "already_verified": False}
+    return _record_capture_result(order_id, row, captured, db_path)
