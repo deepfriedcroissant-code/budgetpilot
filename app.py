@@ -88,6 +88,38 @@ for key, value in (
     if key not in st.session_state:
         st.session_state[key] = value
 
+# PayPal redirects the buyer back with token=ORDER_ID after approval.
+# A fresh Streamlit session is fine: the local SQLite record binds order and nonce.
+payment = st.query_params.get("payment")
+if payment == "success":
+    token = st.query_params.get("token")
+    state = st.query_params.get("state")
+    st.query_params.clear()
+    if os.getenv("BUDGETPILOT_ENABLE_PAYPAL_SANDBOX") != "1":
+        st.session_state.bp_payment_return_error = "Sandbox checkout is disabled; no capture was attempted."
+    elif not token or not state:
+        st.session_state.bp_payment_return_error = "PayPal returned without the expected order token and verification state."
+    else:
+        from paypal_api import capture_order
+        from checkout_flow import finalize_return
+        with st.spinner("Verifying and capturing your PayPal Sandbox order..."):
+            try:
+                result = finalize_return(token, state, capture_order)
+            except Exception:
+                # A capture may have reached PayPal even if confirmation failed.
+                # Do NOT retry automatically; inspect the order in PayPal Sandbox.
+                st.session_state.bp_payment_return_error = (
+                    "Payment could not be verified. Check the order in the PayPal Sandbox "
+                    "dashboard before attempting another capture."
+                )
+            else:
+                st.session_state.bp_payment_verified = True
+                st.session_state.bp_verified_receipt = result
+elif payment == "cancelled":
+    st.query_params.clear()
+    st.session_state.bp_payment_return_error = "PayPal Sandbox checkout was cancelled. No completed payment is recorded."
+
+
 apply_theme()
 st.markdown(
     '<div class="bp-hero"><h1>BudgetPilot</h1>'
@@ -95,6 +127,27 @@ st.markdown(
     'discover a personalized cart, and check out with confidence.</p></div>',
     unsafe_allow_html=True,
 )
+
+# A confirmed payment has its own final screen, including after a redirect
+# opens a fresh Streamlit session. Do not render checkout again for this order.
+if st.session_state.get("bp_verified_receipt"):
+    from ui.order_confirmation import render_verified_confirmation
+    render_verified_confirmation(st.session_state.bp_verified_receipt)
+    if st.button("Start a new shopping trip", type="primary"):
+        _clear_request(None)
+        st.session_state.pop("bp_verified_receipt", None)
+        st.session_state.pop("bp_payment_verified", None)
+        st.session_state.pop("bp_payment_return_error", None)
+        st.rerun()
+    # Sidebar totals may be absent on a new session; completion is still clear.
+    from ui.shopping_dashboard import render_shopping_dashboard
+    with st.sidebar:
+        st.success("Checkout complete")
+        st.caption("Your payment was verified in PayPal Sandbox.")
+    st.stop()
+
+if st.session_state.pop("bp_payment_return_error", None):
+    st.warning("Payment has not been confirmed. Please check the PayPal Sandbox order status before retrying.")
 
 st.divider()
 st.subheader("1 · Your shopping request")
@@ -194,40 +247,6 @@ if request is not None:
         st.caption("Checkout isn't available in this session. Your cart is still saved above.")
 else:
     st.info("Describe what you need above to discover your personalized cart.")
-
-# PayPal redirects the buyer back with token=ORDER_ID after approval.
-# A fresh Streamlit session is fine: the local SQLite record binds order and nonce.
-payment = st.query_params.get("payment")
-if payment == "success":
-    token = st.query_params.get("token")
-    state = st.query_params.get("state")
-    st.query_params.clear()
-    if os.getenv("BUDGETPILOT_ENABLE_PAYPAL_SANDBOX") != "1":
-        st.error("Sandbox checkout is disabled; no capture was attempted.")
-    elif not token or not state:
-        st.error("PayPal returned without the expected order token and verification state.")
-    else:
-        from paypal_api import capture_order
-        from checkout_flow import finalize_return
-        with st.spinner("Verifying and capturing your PayPal Sandbox order..."):
-            try:
-                result = finalize_return(token, state, capture_order)
-            except Exception:
-                # A capture may have reached PayPal even if confirmation failed.
-                # Do NOT retry automatically; inspect the order in PayPal Sandbox.
-                st.error(
-                    "Payment could not be verified. Check the order in the PayPal Sandbox "
-                    "dashboard before attempting another capture."
-                )
-            else:
-                st.session_state.bp_payment_verified = True
-                st.success(
-                    f"Sandbox payment verified: order `{result['order_id']}` · "
-                    f"capture `{result['capture_id']}` · USD ${result['total']} · COMPLETED"
-                )
-elif payment == "cancelled":
-    st.query_params.clear()
-    st.warning("PayPal Sandbox checkout was cancelled. No completed payment is recorded.")
 
 # Render the sidebar *after* the cart controls on each Streamlit rerun.
 # This ensures its totals and checkout status reflect the current edited cart.
