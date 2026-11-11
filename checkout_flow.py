@@ -91,6 +91,8 @@ def finalize_return(order_id, state, capture_fn, db_path=None):
             raise ValueError("Another checkout request is processing this order.")
     # Do not hold a SQLite transaction open across the external network request.
     captured = capture_fn(order_id)
+    if captured.get("order_id") != order_id:
+        raise ValueError("Captured PayPal order ID did not match the approved order.")
     if str(captured.get("status", "")).upper() != "COMPLETED":
         raise ValueError("PayPal did not report a completed capture. Check the order in Sandbox.")
     expected = row["amount"]
