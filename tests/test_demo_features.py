@@ -62,7 +62,8 @@ def test_confirmation_requires_verified_result_and_no_mock_payment():
 
 def test_ui_budget_repair_requires_explicit_apply_and_keeps_cart_checks():
     app = (Path(__file__).parents[1] / "app.py").read_text()
-    assert 'st.button("Apply suggested changes"' in app
+    assert '"Apply suggested changes", type="secondary"' in app
+    assert 'on_click=_apply_suggested_cart' in app
     assert 'if edited and not valid:' in app
     assert 'reset_cart_validation=False' in app
     assert 'request=request' in app
