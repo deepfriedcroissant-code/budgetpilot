@@ -1,4 +1,4 @@
-"""BudgetPilot combined Streamlit frontend — November 10 release candidate.
+"""BudgetPilot shopping assistant — Streamlit frontend.
 
 This app combines team UI components against the shared backend contracts.
 PayPal Sandbox remains opt-in and capture is verified against saved orders.
