@@ -212,6 +212,7 @@ summary = build_sidebar_summary(
     st.session_state.get("budgetpilot_cart_valid", False),
     os.getenv("BUDGETPILOT_ENABLE_PAYPAL_SANDBOX") == "1",
     order_created=bool(st.session_state.get("checkout_order_result")),
+    payment_verified=bool(st.session_state.get("bp_payment_verified")),
 )
 render_shopping_dashboard(
     summary,
