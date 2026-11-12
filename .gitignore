@@ -1,7 +1,32 @@
+# Local API credentials and secret-bearing configurations
 .env
+.env.*
+!.env.example
+!.env.sample
+*.env
+*.env.local
+*.secrets
+secrets.*
+!.secrets.example
+.streamlit/secrets.toml
+**/secrets.toml
+credentials.json
+service-account*.json
+*service-account-key*.json
+*.pem
+*.p12
+*.pfx
+
+# Python / local application data
 __pycache__/
 .pytest_cache/
 *.pyc
 *.db
+*.sqlite3
 .venv/
+venv/
 .budgetpilot/
+
+# Local editor and OS files
+.DS_Store
+.vscode/
