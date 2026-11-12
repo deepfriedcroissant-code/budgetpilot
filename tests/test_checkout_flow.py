@@ -6,7 +6,7 @@ from unittest.mock import patch
 import pytest
 
 import paypal_api
-from checkout_flow import finalize_return, get_order, record_order
+from checkout_flow import finalize_return, get_order, record_order, check_payment_status
 
 
 def _order(state="a" * 40, amount="9.00"):
@@ -52,7 +52,6 @@ def test_invalid_nonce_never_captures(tmp_path):
 @pytest.mark.parametrize("total,currency,status", [
     ("10.00", "USD", "COMPLETED"),
     ("9.00", "EUR", "COMPLETED"),
-    ("9.00", "USD", "PENDING"),
 ])
 def test_unverified_capture_never_marks_complete(tmp_path, total, currency, status):
     db = tmp_path / "state.db"
@@ -64,6 +63,87 @@ def test_unverified_capture_never_marks_complete(tmp_path, total, currency, stat
     assert get_order("ORDER-TEST", "a" * 40, db)["status"] == "CAPTURING"
     with pytest.raises(ValueError, match="already submitted"):
         finalize_return("ORDER-TEST", "a" * 40, capture, db)
+
+
+
+def test_pending_capture_is_recorded_and_never_displayed_as_completed(tmp_path):
+    db = tmp_path / "state.db"
+    record_order(_order(), db)
+    pending = {**_captured("ORDER-TEST"), "status": "PENDING", "reason": "PENDING_REVIEW"}
+    result = finalize_return("ORDER-TEST", "a" * 40, lambda _: pending, db)
+    assert result["status"] == "PENDING"
+    assert result["reason"] == "PENDING_REVIEW"
+    assert get_order("ORDER-TEST", "a" * 40, db)["status"] == "PENDING"
+    assert get_order("ORDER-TEST", "a" * 40, db)["capture_id"] == "CAP-TEST"
+    with pytest.raises(ValueError, match="already submitted"):
+        finalize_return("ORDER-TEST", "a" * 40, lambda _: pytest.fail("double capture"), db)
+
+
+def test_pending_status_refresh_is_read_only_and_can_complete(tmp_path):
+    db = tmp_path / "state.db"
+    record_order(_order(), db)
+    finalize_return("ORDER-TEST", "a" * 40, lambda _: {
+        **_captured("ORDER-TEST"), "status": "PENDING"
+    }, db)
+    calls = []
+    def lookup(order_id):
+        calls.append(order_id)
+        return _captured(order_id)
+    result = check_payment_status("ORDER-TEST", "a" * 40, lookup, db)
+    assert result["status"] == "COMPLETED"
+    assert calls == ["ORDER-TEST"]
+    assert get_order("ORDER-TEST", "a" * 40, db)["status"] == "COMPLETED"
+
+
+def test_old_capturing_order_reconciles_without_another_capture(tmp_path):
+    db = tmp_path / "state.db"
+    record_order(_order(), db)
+    with pytest.raises(RuntimeError):
+        finalize_return("ORDER-TEST", "a" * 40,
+                        lambda _: (_ for _ in ()).throw(RuntimeError("timeout")), db)
+    assert get_order("ORDER-TEST", "a" * 40, db)["status"] == "CAPTURING"
+    observed = check_payment_status("ORDER-TEST", "a" * 40, lambda _: {
+        **_captured("ORDER-TEST"), "status": "PENDING", "reason": "PENDING_REVIEW"
+    }, db)
+    assert observed["status"] == "PENDING"
+
+
+def test_reconciliation_rejects_different_amount_and_capture_id(tmp_path):
+    db = tmp_path / "state.db"
+    record_order(_order(), db)
+    finalize_return("ORDER-TEST", "a" * 40, lambda _: {
+        **_captured("ORDER-TEST"), "status": "PENDING"
+    }, db)
+    with pytest.raises(ValueError, match="amount/currency"):
+        check_payment_status("ORDER-TEST", "a" * 40, lambda _: {
+            **_captured("ORDER-TEST"), "total": "999.99"
+        }, db)
+    with pytest.raises(ValueError, match="Capture ID"):
+        check_payment_status("ORDER-TEST", "a" * 40, lambda _: {
+            **_captured("ORDER-TEST"), "capture_id": "DIFFERENT"
+        }, db)
+    assert get_order("ORDER-TEST", "a" * 40, db)["status"] == "PENDING"
+
+
+def test_readonly_paypal_status_fetch_never_posts(monkeypatch):
+    monkeypatch.setattr(paypal_api, "PAYPAL_BASE_URL", "https://api-m.sandbox.paypal.com")
+    class Response:
+        status_code = 200
+        def json(self):
+            return {"id": "ORDER-TEST", "status": "COMPLETED",
+                    "purchase_units": [{"payments": {"captures": [{
+                        "id": "CAP-TEST", "status": "PENDING",
+                        "status_details": {"reason": "PENDING_REVIEW"},
+                        "amount": {"value": "9.00", "currency_code": "USD"},
+                    }]}}]}
+    with (patch("paypal_api.get_access_token", return_value="FAKE"),
+          patch("paypal_api.requests.get", return_value=Response()) as get,
+          patch("paypal_api.requests.post") as post):
+        result = paypal_api.get_order_status("ORDER-TEST")
+    assert result["status"] == "PENDING"
+    assert result["reason"] == "PENDING_REVIEW"
+    get.assert_called_once()
+    post.assert_not_called()
 
 
 def test_mismatched_captured_order_never_marks_complete(tmp_path):
@@ -121,3 +201,36 @@ def test_production_paypal_blocked(monkeypatch):
     monkeypatch.setattr(paypal_api, "PAYPAL_BASE_URL", "https://api-m.paypal.com")
     with pytest.raises(RuntimeError, match="Sandbox"):
         paypal_api.get_access_token()
+
+
+def test_pending_order_remains_pending_when_status_is_unchanged(tmp_path):
+    db = tmp_path / "state.db"
+    record_order(_order(), db)
+    pending = {**_captured("ORDER-TEST"), "status": "PENDING", "reason": "PENDING_REVIEW"}
+    finalize_return("ORDER-TEST", "a" * 40, lambda _: pending, db)
+    refreshed = check_payment_status("ORDER-TEST", "a" * 40, lambda _: pending, db)
+    assert refreshed["status"] == "PENDING"
+    assert refreshed["reason"] == "PENDING_REVIEW"
+    assert get_order("ORDER-TEST", "a" * 40, db)["status"] == "PENDING"
+
+
+def test_pending_status_lookup_cannot_use_wrong_nonce(tmp_path):
+    db = tmp_path / "state.db"
+    record_order(_order(), db)
+    finalize_return("ORDER-TEST", "a" * 40, lambda _: {
+        **_captured("ORDER-TEST"), "status": "PENDING"
+    }, db)
+    with pytest.raises(ValueError, match="not recognized"):
+        check_payment_status("ORDER-TEST", "b" * 40,
+                             lambda _: pytest.fail("must not query PayPal"), db)
+
+
+def test_pending_payment_interface_blocks_duplicate_checkout():
+    from pathlib import Path
+    source = (Path(__file__).parents[1] / "app.py").read_text(encoding="utf-8")
+    assert 'if st.session_state.get("bp_pending_payment"):' in source
+    assert 'st.button("Check payment status"' in source
+    pending_start = source.index('if st.session_state.get("bp_pending_payment"):')
+    confirmed_start = source.index('if st.session_state.get("bp_verified_receipt"):')
+    assert "st.stop()" in source[pending_start:confirmed_start]
+    assert "check_payment_status(" in source[pending_start:confirmed_start]

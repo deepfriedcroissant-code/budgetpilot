@@ -2,6 +2,7 @@
 Run the demo:  streamlit run ui/product_display.py
 """
 from decimal import Decimal, InvalidOperation
+from html import escape
 
 NOT_PROVIDED = "Not provided"
 
@@ -103,7 +104,7 @@ def build_rows(cart, catalog):
 # Streamlit rendering
 # --------------------------------------------------------------------------
 def render_product_display(cart, catalog, layout="cards", show_quantity=True,
-                           columns=3):
+                           columns=3, request=None):
     """Render the recommended products. layout: 'cards' or 'table'.
 
     Returns the rows so app.py can reuse them. Display only: totals and
@@ -131,21 +132,32 @@ def render_product_display(cart, catalog, layout="cards", show_quantity=True,
     if layout == "table":
         _render_table(st, rows, show_quantity)
     else:
-        _render_cards(st, rows, show_quantity, columns)
+        _render_cards(st, rows, show_quantity, columns, request=request, catalog=_normalize_catalog(catalog))
     return rows
 
 
-def _render_cards(st, rows, show_quantity, columns):
+def _render_cards(st, rows, show_quantity, columns, request=None, catalog=None):
     for start in range(0, len(rows), columns):
         cols = st.columns(columns)
         for col, row in zip(cols, rows[start:start + columns]):
             with col, st.container(border=True):
-                st.markdown(f"**{row['name']}**")
-                st.caption(f"{row['category'].replace('_', ' ').title()}  ·  `{row['id']}`")
-                st.markdown(f"### {format_price(row['unit_price'])}")
-                st.write(f"Stock: {format_stock(row['stock'])}")
-                if show_quantity:
-                    st.write(f"Recommended quantity: **{row['quantity']}**")
+                from ui.theme import product_icon
+                icon = product_icon(row)
+                name = escape(str(row["name"]))
+                category = escape(row["category"].replace("_", " ").title())
+                st.markdown(
+                    f'<div class="bp-thumb bp-pop" role="img" aria-label="{category} product">'
+                    f'{icon}</div><div class="bp-product-name">{name}</div>'
+                    f'<div class="bp-muted">{category}</div>'
+                    f'<div class="bp-price">{format_price(row["unit_price"])}</div>',
+                    unsafe_allow_html=True,
+                )
+                st.caption(f'{format_stock(row["stock"])} · {row["quantity"]} in your cart' if show_quantity
+                           else format_stock(row["stock"]))
+                if request is not None:
+                    from shopping_assistant import explain_recommendation
+                    with st.expander("Why this pick?"):
+                        st.caption(explain_recommendation(catalog[row["id"]], request))
                 for w in row["warnings"]:
                     st.warning(w)
 

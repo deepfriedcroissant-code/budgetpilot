@@ -37,7 +37,7 @@ def render_checkout(
     Renders the Cart Approval and PayPal Sandbox Checkout section.
     Returns the created order dictionary if an order has been created for the current cart, else None.
     """
-    st.subheader("Cart Approval & PayPal Checkout")
+    st.subheader("Review & pay")
 
     # Filter out removed / 0-quantity items
     active_cart = [
@@ -72,7 +72,7 @@ def render_checkout(
     # Dynamic key tied to current_fp ensures checkbox automatically resets when cart is edited
     approval_key = f"checkout_approved_{current_fp}"
     is_approved = st.checkbox(
-        "I approve this cart and total for PayPal Sandbox checkout",
+        "I have reviewed my cart and agree to the displayed total",
         key=approval_key,
     )
 
@@ -82,7 +82,7 @@ def render_checkout(
     button_disabled = (not is_approved) or (existing_order is not None)
 
     if st.button(
-        "Checkout with PayPal Sandbox",
+        "Continue to PayPal Sandbox",
         type="primary",
         disabled=button_disabled,
     ):
@@ -118,7 +118,7 @@ def render_checkout(
                 "**Simulated PayPal Order (Mock Mode)** — PayPal Sandbox credentials were not found in `.env`, so this order is simulated."
             )
         else:
-            st.success("**Live PayPal Sandbox Order Created!**")
+            st.success("**Your checkout is ready**")
 
         col1, col2, col3 = st.columns(3)
         col1.metric("Order ID", existing_order.get("order_id", "N/A"))
@@ -128,9 +128,9 @@ def render_checkout(
         approval_url = existing_order.get("approval_url")
         if approval_url:
             if hasattr(st, "link_button"):
-                st.link_button("👉 Approve Order on PayPal Sandbox", approval_url)
+                st.link_button("Continue securely with PayPal Sandbox", approval_url)
             else:
-                st.markdown(f"👉 **[Approve Order on PayPal Sandbox]({approval_url})**")
+                st.markdown(f"**[Continue with PayPal Sandbox]({approval_url})**")
             st.caption("You will return to BudgetPilot after approving in PayPal Sandbox.")
 
         st.info(
