@@ -13,6 +13,13 @@ def _remove_item(quantity_key: str) -> None:
     st.session_state[quantity_key] = 0
 
 
+def _add_one(quantity_key: str, stock: int | None) -> None:
+    """Increase a cart quantity, while honoring known stock limits."""
+    quantity = int(st.session_state.get(quantity_key, 0))
+    if stock is None or quantity < stock:
+        st.session_state[quantity_key] = quantity + 1
+
+
 def render_cart_display(
     cart: list[dict],
     catalog: dict,
@@ -57,7 +64,7 @@ def render_cart_display(
             f"| Unit price: ${Decimal(str(product['price'])):.2f}"
         )
 
-        quantity_col, remove_col = st.columns([3, 1])
+        quantity_col, add_col, remove_col = st.columns([3, 1, 1])
 
         with quantity_col:
             quantity = st.number_input(
@@ -68,6 +75,19 @@ def render_cart_display(
                 help="Set quantity to zero to remove this item.",
             )
 
+        with add_col:
+            st.write("")
+            st.button(
+                "＋ Add",
+                key=f"add_{cart_version}_{product_id}",
+                on_click=_add_one,
+                args=(quantity_key, product.get("stock")),
+                disabled=(isinstance(product.get("stock"), int)
+                          and int(st.session_state.get(quantity_key, 0)) >= product["stock"]),
+                help="Add one more to your cart",
+                use_container_width=True,
+            )
+
         with remove_col:
             st.write("")
             st.button(
@@ -75,6 +95,7 @@ def render_cart_display(
                 key=remove_key,
                 on_click=_remove_item,
                 args=(quantity_key,),
+                use_container_width=True,
             )
 
         # Zero means the user removed the product.
@@ -128,7 +149,10 @@ def render_cart_display(
 
     remaining = budget_amount - total
 
-    st.subheader("Budget summary")
+    st.subheader("Your budget at a glance")
+    if budget_amount > 0:
+        used_fraction = max(0.0, min(1.0, float(total / budget_amount)))
+        st.progress(used_fraction, text=f"{used_fraction:.0%} of your budget allocated")
 
     total_col, remaining_col = st.columns(2)
 

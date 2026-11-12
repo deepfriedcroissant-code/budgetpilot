@@ -1,18 +1,13 @@
-"""No-network tests for Gemini 3.8 Flash configuration."""
+"""No-network tests for active Gemini 3.1 Flash-Lite JSON configuration."""
 from parser import _generation_config
 
 
-def test_gemini_38_flash_uses_low_thinking():
-    config = _generation_config("gemini-3.8-flash")
-    assert config["response_mime_type"] == "application/json"
-    assert config["thinking_config"]["thinking_level"] == "low"
-    assert config["max_output_tokens"] == 1024
-
-
-def test_other_models_do_not_receive_unsupported_thinking_config():
-    assert _generation_config("gemini-2.5-flash") == {
+def test_gemini_31_flash_lite_requests_json():
+    assert _generation_config("gemini-3.1-flash-lite") == {
         "response_mime_type": "application/json"
     }
-    assert _generation_config("custom-model") == {
-        "response_mime_type": "application/json"
-    }
+
+
+def test_other_models_do_not_receive_unnecessary_thinking_settings():
+    for model in ("gemini-2.5-flash", "gemini-3.8-flash", "custom-model"):
+        assert _generation_config(model) == {"response_mime_type": "application/json"}
